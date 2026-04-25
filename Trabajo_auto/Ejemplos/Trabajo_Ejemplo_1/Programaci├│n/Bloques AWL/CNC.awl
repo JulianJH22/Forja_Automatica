@@ -1,0 +1,527 @@
+﻿FUNCTION_BLOCK "UP_CNC"
+TITLE = Unidad productiva CNC
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+//Gestiona la CNC.
+//Presenta los siguientes parámetros:
+//- start: inicia la unidad productiva.
+//- emer: señal de emergencia (error asíncrono).
+//- cong: señal de congelación.
+//- rearme: vuelta al estado de standby de un estado de error.
+//- lapiz: indica que se van a procesar lápices.
+//- sacapuntas: indica que se van a procesar sacapuntas.
+//- escuadra: indica que se van a procesar escuadras.
+//- cartabon: indica que se van a procesar cartabones.
+//- home: indica el estado en la posición fetal.
+//- tmax_cnc_lapiz: tiempo máximo para la fabricación del lápiz.
+//- tmax_cnc_sacapuntas: tiempo máximo para la fabricación del sacapuntas.
+//- tmax_cnc_escuadra: tiempo máximo para la fabricación de la escuadra.
+//- tmax_cnc_cartabon: tiempo máximo para la fabricación del cartabón.
+//- temp_max: temporizador de las manioabras.
+//- cnc_lapiz: programa del lápiz.
+//- cnc_sacapuntas: programa del sacapuntas.
+//- cnc_escuadra: programa de la escuadra.
+//- cnc_cartabon: programa del cartabón.
+//- bit_standby: estado de standby.
+//- bit_ocupación: el robot se encuentra en medio de una maniobra.
+//- bit_error_tiempo_lapiz: error síncrono en la lápiz.
+//- bit_error_tiempo_sacapuntas: error síncrono en la sacapuntas.
+//- bit_error_tiempo_escuadra: error síncrono en las escuadras.
+//- bit_error_tiempo_cartabon: error síncrono en los cartabones.
+//- bit_error_config_lapiz: error síncrono por mala configuración inicial en la fabricación del lápiz.
+//- bit_error_config_sacapuntas: error síncrono por mala configuración inicial en la fabricación del sacapuntas.
+//- bit_error_config_escuadras: error síncrono por mala configuración inicial en la fabricación de la escuadra.
+//- bit_error_config_cartabon: error síncrono por mala configuración inicial en la fabricación del cartabón.
+//- bit_emer: estado de emergencia.
+//- bit_trabajo: se encarga de la conexión de la unidad productiva.
+//- x_carga: estado de carga.
+//- x_descarga: estado de descarga.
+//- x_standby: estado de standby.
+//- x_error_tiempo_lapiz: estado de error síncrono en la fabricación del lápiz.
+//- x_error_tiempo_sacapuntas: estado de error síncrono en la la fabricación del sacapuntas.
+//- x_error_tiempo_escuadra: estado de error síncrono en la fabricación de la escuadra.
+//- x_error_tiempo_cartabon: estado de error síncrono en la la fabricación del cartabón.
+//- x_error_config_lapiz: estado de error síncrono por mala configuración inicial en la fabricación del lápiz.
+//- x_error_config_sacapuntas: estado de error síncrono por mala configuración inicial en la fabricación del sacapuntas.
+//- x_error_config_escuadra: estado de error síncrono por mala configuración inicial en la fabricación del lápiz.
+//- x_error_config_cartabon: estado de error síncrono por mala configuración inicial en la fabricación del cartabon.
+//- x_emer: estado de emergencia por error asíncrono.
+//- SFC_lapiz: maniobra para la fabricación del lápiz de tipo SFC_Programa con bloque de datos multiinstancia.
+//- SFC_sacapuntas:  maniobra para la fabricación del sacapuntas de tipo SFC_Programa con bloque de datos multiinstancia.
+//- SFC_escuadra:  maniobra para la fabricación de la escuadra de tipo SFC_Programa con bloque de datos multiinstancia.
+//- SFC_cartabon:  maniobra para la fabricación del cartabon de tipo SFC_Programa con bloque de datos multiinstancia.
+//- bit_fin_lápiz: finalización de la fabricación del lápiz.
+//- bit_fin_sacapuntas: finalización de la fabricación del sacapuntas. 
+//- bit_fin_escuadra: finalización de la fabricación de la escuadra.
+//- bit_fin_cartabón: finalización de la fabricación del cartabón. 
+//
+//
+//Los bits de fin son temporales porque las unidades productivas están pensadas para estar trabajando constantemente.
+   VAR_INPUT 
+      start : Bool;
+      emer : Bool;
+      rearme : Bool;
+      cong : Bool;
+      lapiz : Bool;
+      sacapuntas : Bool;
+      escuadra : Bool;
+      cartabon : Bool;
+      home : Bool;
+      tmax_cnc_lapiz : S5Time;
+      tmax_cnc_sacapuntas : S5Time;
+      tmax_cnc_escuadra : S5Time;
+      tmax_cnc_cartabon : S5Time;
+      temp_max : Timer;
+   END_VAR
+
+   VAR_OUTPUT 
+      cnc_lapiz : Bool;
+      cnc_sacapuntas : Bool;
+      cnc_escuadra : Bool;
+      cnc_cartabon : Bool;
+      bit_standby : Bool;
+      bit_ocupacion : Bool;
+      bit_error_tiempo_lapiz : Bool;
+      bit_error_tiempo_sacapuntas : Bool;
+      bit_error_tiempo_escuadra : Bool;
+      bit_error_tiempo_cartabon : Bool;
+      bit_error_config_lapiz : Bool;
+      bit_error_config_sacapuntas : Bool;
+      bit_error_config_escuadra : Bool;
+      bit_error_config_cartabon : Bool;
+      bit_emer : Bool;
+   END_VAR
+
+   VAR 
+      bit_trabajo : Bool;
+      x_lapiz : Bool;
+      x_sacapuntas : Bool;
+      x_escuadra : Bool;
+      x_cartabon : Bool;
+      x_standby : Bool;
+      x_error_tiempo_lapiz : Bool;
+      x_error_tiempo_sacapuntas : Bool;
+      x_error_tiempo_escuadra : Bool;
+      x_error_tiempo_cartabon : Bool;
+      x_error_config_lapiz : Bool;
+      x_error_config_sacapuntas : Bool;
+      x_error_config_escuadra : Bool;
+      x_error_config_cartabon : Bool;
+      x_emer : Bool;
+      SFC_lapiz : "SFC_Programa";
+      SFC_sacapuntas : "SFC_Programa";
+      SFC_Escuadra : "SFC_Programa";
+      SFC_Cartabon : "SFC_Programa";
+   END_VAR
+
+   VAR_TEMP 
+      bit_fin_lapiz : Bool;
+      bit_fin_sacapuntas : Bool;
+      bit_fin_escuadra : Bool;
+      bit_fin_cartabon : Bool;
+   END_VAR
+
+
+BEGIN
+NETWORK
+TITLE = Plantilla de desconexión - Error asíncrono
+//Si se está en un estado de error síncrono no se entra en emergencia.
+      O #x_standby;
+      O #x_lapiz;
+      O #x_sacapuntas;
+      O #x_cartabon;
+      O #x_escuadra;
+      U #emer;
+      S #x_emer;
+      R #x_standby;
+      R #x_lapiz;
+      R #x_sacapuntas;
+      R #x_cartabon;
+      R #x_escuadra;
+
+      SPBN _emer;
+
+      CALL #SFC_lapiz
+      (  reset                       := true , 
+         actuador1                   := #cnc_lapiz
+      );
+
+      CALL #SFC_sacapuntas
+      (  reset                       := true , 
+         actuador1                   := #cnc_sacapuntas
+      );
+
+      CALL #SFC_Escuadra
+      (  reset                       := TRUE , 
+         actuador1                   := #cnc_escuadra
+      );
+
+      CALL #SFC_Cartabon
+      (  reset                       := TRUE , 
+         actuador1                   := #cnc_cartabon
+      );
+
+_emer:      NOP 0;
+
+      O #x_standby;
+      O #x_lapiz;
+      O #x_sacapuntas;
+      O #x_cartabon;
+      O #x_escuadra;
+      U #emer;
+      BEB;
+NETWORK
+TITLE = Plantilla de desconexión - STOP
+//Desconexión de la unidad productiva. 
+//Reinicia todos los parámetros para futuras conexiones.
+//Llamada a las maniobras usando la entrada asíncrona para indicar su pausa.
+//Después de la caja de código se especifica la instrucción “UN #start”, que coincide con la instrucción con la que se activó la plantilla. Esto es porque después de la caja, la RLO = 1 y /ER = 0. Por lo tanto, si la plantilla no se ejecuta, tras saltar la caja de código la RLO = 1 cuando debería ser 0 (UN #start no se cumple).
+      UN #start;
+      R #bit_trabajo;
+      R #bit_emer;
+      R #bit_error_config_lapiz;
+      R #bit_error_config_sacapuntas;
+      R #bit_error_tiempo_lapiz;
+      R #bit_error_tiempo_sacapuntas;
+      R #bit_standby;
+      R #bit_ocupacion;
+      R #temp_max;
+      FR #temp_max;
+
+      SPBN stop;
+
+      CALL #SFC_lapiz
+      (  reset                       := true , 
+         actuador1                   := #cnc_lapiz
+      );
+
+      CALL #SFC_sacapuntas
+      (  reset                       := true , 
+         actuador1                   := #cnc_sacapuntas
+      );
+
+      CALL #SFC_Escuadra
+      (  reset                       := TRUE , 
+         actuador1                   := #cnc_sacapuntas
+      );
+
+      CALL #SFC_Cartabon
+      (  reset                       := TRUE , 
+         actuador1                   := #cnc_cartabon
+      );
+
+stop:      NOP 0;
+
+      UN #start;
+      BEB;
+NETWORK
+TITLE = Plantilla de conexión
+//Conexión de la unidad productiva.
+      U #start;
+      FP #bit_trabajo;
+      S #x_standby;
+      R #x_lapiz;
+      R #x_sacapuntas;
+      R #x_cartabon;
+      R #x_escuadra;
+      R #x_emer;
+      R #x_error_config_lapiz;
+      R #x_error_config_sacapuntas;
+      R #x_error_config_escuadra;
+      R #x_error_config_cartabon;
+      R #x_error_tiempo_lapiz;
+      R #x_error_tiempo_sacapuntas;
+      R #x_error_tiempo_escuadra;
+      R #x_error_tiempo_cartabon;
+NETWORK
+TITLE = Plantilla de congelación
+//Congela la unidad productiva: habilita los componentes y resetea los actuadores (llamadas a maniobras).
+//Se repite el estimulo de activación de la plantilla antes de la instrucción "BEB" para asegurar la salida del bloque.
+      U #cong;
+
+      SPBN _cong;
+
+      R #temp_max;//Habilitación de componentes
+      FR #temp_max;
+
+      CALL #SFC_lapiz
+      (  reset                       := TRUE , 
+         actuador1                   := #cnc_lapiz
+      );
+
+      CALL #SFC_sacapuntas
+      (  reset                       := TRUE , 
+         actuador1                   := #cnc_sacapuntas
+      );
+
+      CALL #SFC_Escuadra
+      (  reset                       := TRUE , 
+         actuador1                   := #cnc_escuadra
+      );
+
+      CALL #SFC_Cartabon
+      (  reset                       := TRUE , 
+         actuador1                   := #cnc_cartabon
+      );
+
+_cong:      NOP 0;
+
+      U #cong;//Repetición del estímulo de activación
+      BEB;
+NETWORK
+TITLE = Salida del estado de emergencia
+//Rearme
+      U #x_emer;
+      UN #emer;
+      U #rearme;
+      S #x_standby;
+      R #x_emer;
+NETWORK
+TITLE = Rearme errores síncronos
+//Se considera la posibilidad de rearme tras errores síncronos.
+      O #x_error_config_lapiz;
+      O #x_error_config_sacapuntas;
+      O #x_error_config_escuadra;
+      O #x_error_config_cartabon;
+      O #x_error_tiempo_lapiz;
+      O #x_error_tiempo_sacapuntas;
+      O #x_error_tiempo_escuadra;
+      O #x_error_tiempo_cartabon;
+      U #rearme;
+      S #x_standby;
+      R #x_error_config_lapiz;
+      R #x_error_config_sacapuntas;
+      R #x_error_config_escuadra;
+      R #x_error_config_cartabon;
+      R #x_error_tiempo_lapiz;
+      R #x_error_tiempo_sacapuntas;
+      R #x_error_tiempo_escuadra;
+      R #x_error_tiempo_cartabon;
+NETWORK
+TITLE = x_standby -> x_lapiz
+      U #x_standby;
+      U #lapiz;
+      S #x_lapiz;
+      R #x_standby;
+NETWORK
+TITLE = x_standby -> x_sacapuntas
+      U #x_standby;
+      U #sacapuntas;
+      S #x_sacapuntas;
+      R #x_standby;
+NETWORK
+TITLE = x_standby -> x_escuadra
+      U #x_standby;
+      U #escuadra;
+      S #x_escuadra;
+      R #x_standby;
+NETWORK
+TITLE = x_standby -> x_cartabon
+      U #x_standby;
+      U #cartabon;
+      S #x_cartabon;
+      R #x_standby;
+NETWORK
+TITLE = Llamada a la maniobra de fabricación del lápiz
+//Entrada de error asíncrono false (se gestiona en la plantilla de desconexión).
+      U #x_lapiz;
+
+      SPBN _lapiz;
+      CALL #SFC_lapiz
+      (  sensor1                     := #lapiz , 
+         sensor2                     := #home , 
+         reset                       := false , 
+         tiempo_error                := #tmax_cnc_lapiz , 
+         temp_error                  := #temp_max , 
+         bit_fin                     := #bit_fin_lapiz , 
+         bit_error_tiempo            := #bit_error_tiempo_lapiz , 
+         bit_error_config            := #bit_error_config_lapiz , 
+         bit_ocupacion               := #bit_ocupacion , 
+         actuador1                   := #cnc_lapiz
+      );
+
+      U #bit_error_tiempo_lapiz;
+      S #x_error_tiempo_lapiz;
+      R #x_lapiz;
+
+      U #bit_error_config_lapiz;
+      S #x_error_config_lapiz;
+      R #x_lapiz;
+
+      U #bit_fin_lapiz;
+      S #x_standby;
+      R #x_lapiz;
+
+_lapiz:      NOP 0;
+
+NETWORK
+TITLE = Llamada a la maniobra de fabricación del sacapuntas
+      U #x_sacapuntas;
+
+      SPBN _sacapuntas;
+      CALL #SFC_sacapuntas
+      (  sensor1                     := #sacapuntas , 
+         sensor2                     := #home , 
+         reset                       := false , 
+         tiempo_error                := #tmax_cnc_sacapuntas , 
+         temp_error                  := #temp_max , 
+         bit_fin                     := #bit_fin_sacapuntas , 
+         bit_error_tiempo            := #bit_error_tiempo_sacapuntas , 
+         bit_error_config            := #bit_error_config_sacapuntas , 
+         bit_ocupacion               := #bit_ocupacion , 
+         actuador1                   := #cnc_sacapuntas
+      );
+
+
+      U #bit_error_tiempo_sacapuntas;
+      S #x_error_tiempo_sacapuntas;
+      R #x_sacapuntas;
+
+      U #bit_error_config_sacapuntas;
+      S #x_error_config_sacapuntas;
+      R #x_sacapuntas;
+
+      U #bit_fin_sacapuntas;
+      S #x_standby;
+      R #x_sacapuntas;
+
+_sacapuntas:      NOP 0;
+
+NETWORK
+TITLE = Llamada a la maniobra de fabricación del sacapuntas
+      U #x_escuadra;
+
+      SPBN _escuadra;
+      CALL #SFC_Escuadra
+      (  sensor1                     := #escuadra , 
+         sensor2                     := #home , 
+         reset                       := false , 
+         tiempo_error                := #tmax_cnc_escuadra , 
+         temp_error                  := #temp_max , 
+         bit_fin                     := #bit_fin_escuadra , 
+         bit_error_tiempo            := #bit_error_tiempo_escuadra , 
+         bit_error_config            := #bit_error_config_escuadra , 
+         bit_ocupacion               := #bit_ocupacion , 
+         actuador1                   := #cnc_escuadra
+      );
+
+
+      U #bit_error_tiempo_escuadra;
+      S #x_error_tiempo_escuadra;
+      R #x_escuadra;
+
+      U #bit_error_config_escuadra;
+      S #x_error_config_escuadra;
+      R #x_escuadra;
+
+      U #bit_fin_escuadra;
+      S #x_standby;
+      R #x_escuadra;
+
+_escuadra:      NOP 0;
+
+NETWORK
+TITLE = Llamada a la maniobra de fabricación del sacapuntas
+      U #x_cartabon;
+
+      SPBN _cartabon;
+      CALL #SFC_Cartabon
+      (  sensor1                     := #cartabon , 
+         sensor2                     := #home , 
+         reset                       := false , 
+         tiempo_error                := #tmax_cnc_cartabon , 
+         temp_error                  := #temp_max , 
+         bit_fin                     := #bit_fin_cartabon , 
+         bit_error_tiempo            := #bit_error_tiempo_cartabon , 
+         bit_error_config            := #bit_error_config_cartabon , 
+         bit_ocupacion               := #bit_ocupacion , 
+         actuador1                   := #cnc_cartabon
+      );
+
+
+      U #bit_error_tiempo_cartabon;
+      S #x_error_tiempo_cartabon;
+      R #x_cartabon;
+
+      U #bit_error_config_cartabon;
+      S #x_error_config_cartabon;
+      R #x_cartabon;
+
+      U #bit_fin_cartabon;
+      S #x_standby;
+      R #x_cartabon;
+
+_cartabon:      NOP 0;
+
+NETWORK
+TITLE = Bit de standby
+//Indica el estado de standby.
+      U #x_standby;
+      = #bit_standby;
+NETWORK
+TITLE = Bit de emergencia
+//Indica el estado de emergencia.
+      U #x_emer;
+      = #bit_emer;
+NETWORK
+TITLE = Bit error tiempo lápiz
+//Indica el estado de error síncrono por tiempo de fabricación del lápiz.
+      U #x_error_tiempo_lapiz;
+      = #bit_error_tiempo_lapiz;
+NETWORK
+TITLE = Bit error tiempo sacapuntas
+//Indica el estado de error síncrono por tiempo de fabricación del sacapuntas.
+      U #x_error_tiempo_sacapuntas;
+      = #bit_error_tiempo_sacapuntas;
+NETWORK
+TITLE = Bit error tiempo escuadra
+//Indica el estado de error síncrono por tiempo de fabricación de la escuadra.
+      U #x_error_tiempo_escuadra;
+      = #bit_error_tiempo_escuadra;
+NETWORK
+TITLE = Bit error tiempo cartabón
+//Indica el estado de error síncrono por tiempo de fabricación del cartabón.
+      U #x_error_tiempo_cartabon;
+      = #bit_error_tiempo_cartabon;
+NETWORK
+TITLE = Bit error config lápiz
+//Indica el estado de error síncrono por mala configuración inicial en la fabricación del lápiz.
+      U #x_error_config_lapiz;
+      = #bit_error_config_lapiz;
+NETWORK
+TITLE = Bit error config sacapuntas
+//Indica el estado de error síncrono por mala configuración inicial en la fabricación del sacapuntas.
+      U #x_error_config_sacapuntas;
+      = #bit_error_config_sacapuntas;
+NETWORK
+TITLE = Bit error config escuadra
+//Indica el estado de error síncrono por mala configuración inicial en la fabricación de la escuadra.
+      U #x_error_config_escuadra;
+      = #bit_error_config_escuadra;
+NETWORK
+TITLE = Bit error config cartabón
+//Indica el estado de error síncrono por mala configuración inicial en la fabricación del cartabón.
+      U #x_error_config_cartabon;
+      = #bit_error_config_cartabon;
+END_FUNCTION_BLOCK
+
+DATA_BLOCK "UP_CNC1_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"UP_CNC"
+
+BEGIN
+
+END_DATA_BLOCK
+
+DATA_BLOCK "UP_CNC2_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"UP_CNC"
+
+BEGIN
+
+END_DATA_BLOCK
+

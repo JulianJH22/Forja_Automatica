@@ -1,0 +1,304 @@
+﻿ORGANIZATION_BLOCK "main"
+TITLE = "Main Program Sweep (Cycle)"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+//Se encarga de llamar a las unidades productivas, integrando los modos de marcha y las emergencias. Llama a los bloques en el siguiente orden:
+//- Emergencia global
+//- Emergencias locales
+//- Rearmes
+//- Modos de marcha
+//- Unidades productivas
+//Las salidas de los bloques de emergencia y modos de marcha determinarán las entradas “emer”, “rearme”, “cong” y “start” de las unidades productivas.
+//
+
+BEGIN
+NETWORK
+TITLE = Gemer global
+//Llama a la emergencia global.
+      CALL "GEMER_Global";
+NETWORK
+TITLE = Gemer robot1
+//Si no hay emergencia global, llama a la emergencia del robot 1.
+      UN "x_emer";
+
+      SPBN _emer_robot1;
+
+      CALL "GEMER_Local", "GEMER_Robot1_DB"
+      (  emer                        := "emer_local_robot1" , 
+         rearme                      := "rearme_local_robot1" , 
+         bit_emer                    := "robot1_emer"
+      );
+
+_emer_robot1:      NOP 0;
+NETWORK
+TITLE = Gemer robot2
+//Si no hay emergencia global, llama a la emergencia del robot 2.
+      UN "x_emer";
+
+      SPBN _emer_robot2;
+
+      CALL "GEMER_Local", "GEMER_Robot2_DB"
+      (  emer                        := "emer_local_robot2" , 
+         rearme                      := "rearme_local_robot2" , 
+         bit_emer                    := "robot2_emer"
+      );
+
+_emer_robot2:      NOP 0;
+NETWORK
+TITLE = Gemer cnc1
+//Si no hay emergencia global, llama a la emergencia del cnc 1.
+      UN "x_emer";
+
+      SPBN _emer_cnc1;
+
+      CALL "GEMER_Local", "GEMER_CNC1_DB"
+      (  emer                        := "emer_local_cnc1" , 
+         rearme                      := "rearme_local_cnc1" , 
+         bit_emer                    := "cnc1_emer"
+      );
+
+_emer_cnc1:      NOP 0;
+NETWORK
+TITLE = Gemer cnc2
+//Si no hay emergencia global, llama a la emergencia del cnc 2.
+      UN "x_emer";
+
+      SPBN _emer_cnc2;
+
+      CALL "GEMER_Local", "GEMER_CNC2_DB"
+      (  emer                        := "emer_local_cnc2" , 
+         rearme                      := "rearme_local_cnc2" , 
+         bit_emer                    := "cnc2_emer"
+      );
+
+_emer_cnc2:      NOP 0;
+NETWORK
+TITLE = Gemer simple efecto1
+      UN "x_emer";
+
+      SPBN _emer_simple_efecto1;
+
+      CALL "GEMER_Local", "GEMER_Simple_Efecto1_DB"
+      (  emer                        := "emer_local_simple_efecto1" , 
+         rearme                      := "rearme_local_simple_efecto1" , 
+         bit_emer                    := "sef1_emer"
+      );
+
+_emer_simple_efecto1:      NOP 0;
+NETWORK
+TITLE = Gemer palets vacíos
+      UN "x_emer";
+
+      SPBN _palets_vacios1;
+
+      CALL "GEMER_Local", "GEMER_Local_Palets_Vacios_DB"
+      (  emer                        := "emer_local_palets_vacios" , 
+         rearme                      := "rearme_local_palets_vacios" , 
+         bit_emer                    := "pa_emer"
+      );
+
+_palets_vacios1:      NOP 0;
+NETWORK
+TITLE = Rearme robot1
+      O "rearme";
+      O "rearme_local_robot1";
+      = "robot1_rearme";
+NETWORK
+TITLE = Rearme robot2
+      O "rearme";
+      O "rearme_local_robot2";
+      = "robot2_rearme";
+NETWORK
+TITLE = Rearme cnc1
+      O "rearme";
+      O "rearme_local_cnc1";
+      = "cnc1_rearme";
+NETWORK
+TITLE = Rearme cnc2
+      O "rearme";
+      O "rearme_local_cnc2";
+      = "cnc2_rearme";
+NETWORK
+TITLE = Rearme simple efecto1
+      O "rearme";
+      O "rearme_local_simple_efecto1";
+      = "sef1_rearme";
+NETWORK
+TITLE = Rearme palets vacíos
+      O "rearme";
+      O "rearme_local_palets_vacios";
+      = "pa_rearme";
+NETWORK
+TITLE = GMM
+//Si no hay emergencia global, se ejecutan los modos de marcha. En caso contrario, se ejecutarán desde GEMER_Global, que activará la plantilla de desconexión:
+      UN "x_emer";
+
+      SPBN _gmm_emer;
+
+      CALL "GMM", "GMM_DB"
+      (  on                          := "gmm_on" , 
+         lote_pequenio               := "gmm_lote_pequenio" , 
+         lote_mediano                := "gmm_lote_mediano" , 
+         lote_grande                 := "gmm_lote_grande" , 
+         mcong                       := "gmm_mcong" , 
+         cong                        := "gmm_cong" , 
+         emer                        := FALSE , 
+         bit_paro                    := "gmm_bit_paro" , 
+         bit_marcha                  := "gmm_bit_marcha" , 
+         bit_congelacion             := "gmm_bit_congelacion"
+      );
+
+_gmm_emer:      NOP 0;
+NETWORK
+TITLE = UP_Robot1
+      CALL "UP_Robot", "UP_Robot1_DB"
+      (  start                       := "gmm_bit_marcha" , 
+         emer                        := "robot1_emer" , 
+         rearme                      := "robot1_rearme" , 
+         cong                        := "gmm_bit_congelacion" , 
+         dc                          := "robot1_dc" , 
+         fin_p                       := "robot1_fin_p" , 
+         home                        := "robot1_home" , 
+         tiempo_max                  := "datosProduccion".tmax_carga_descarga , 
+         temp_max                    := "robot1_temp" , 
+         cargar                      := "robot1_cargar" , 
+         descargar                   := "robot1_descargar" , 
+         bit_standby                 := "robot1_b_standby" , 
+         bit_ocupacion               := "robot1_b_ocupacion" , 
+         bit_error_tiempo_carga      := "robot1_bdt_carga" , 
+         bit_error_tiempo_descarga   := "robot1_bdt_descarga" , 
+         bit_error_config_carga      := "robot1_bdc_carga" , 
+         bit_error_config_descarga   := "robot1_bdc_descarga" , 
+         bit_emer                    := "robot1_b_emer"
+      );
+NETWORK
+TITLE = UP_Robot2
+      CALL "UP_Robot", "UP_Robot2_DB"
+      (  start                       := "gmm_bit_marcha" , 
+         emer                        := "robot2_emer" , 
+         rearme                      := "robot2_rearme" , 
+         cong                        := "gmm_bit_congelacion" , 
+         dc                          := "robot2_dc" , 
+         fin_p                       := "robot2_fin_p" , 
+         home                        := "robot2_home" , 
+         tiempo_max                  := "datosProduccion".tmax_carga_descarga , 
+         temp_max                    := "robot2_temp" , 
+         cargar                      := "robot2_cargar" , 
+         descargar                   := "robot2_descargar" , 
+         bit_standby                 := "robot2_b_standby" , 
+         bit_ocupacion               := "robot2_b_ocupacion" , 
+         bit_error_tiempo_carga      := "robot2_bdt_carga" , 
+         bit_error_tiempo_descarga   := "robot2_bdt_descarga" , 
+         bit_error_config_carga      := "robot2_bdc_carga" , 
+         bit_error_config_descarga   := "robot2_bdc_descarga" , 
+         bit_emer                    := "robot2_b_emer"
+      );
+NETWORK
+TITLE = UP_CNC1
+      CALL "UP_CNC", "UP_CNC1_DB"
+      (  start                       := "gmm_bit_marcha" , 
+         emer                        := "cnc1_emer" , 
+         rearme                      := "cnc1_rearme" , 
+         cong                        := "gmm_bit_congelacion" , 
+         lapiz                       := "cnc1_lapiz" , 
+         sacapuntas                  := "cnc1_sacapuntas" , 
+         escuadra                    := "cnc1_escuadra" , 
+         cartabon                    := "cnc1_cartabon" , 
+         home                        := "cnc1_home" , 
+         tmax_cnc_lapiz              := "datosProduccion".tmax_cnc_lapiz , 
+         tmax_cnc_sacapuntas         := "datosProduccion".tmax_cnc_sacapuntas , 
+         tmax_cnc_escuadra           := "datosProduccion".tmax_cnc_escuadra , 
+         tmax_cnc_cartabon           := "datosProduccion".tmax_cnc_cartabon , 
+         temp_max                    := "cnc1_temp" , 
+         cnc_lapiz                   := "cnc1_cnc_lapiz" , 
+         cnc_sacapuntas              := "cnc1_cnc_sacapuntas" , 
+         cnc_escuadra                := "cnc1_cnc_escuadra" , 
+         cnc_cartabon                := "cnc1_cnc_cartabon" , 
+         bit_standby                 := "cnc1_b_standby" , 
+         bit_ocupacion               := "cnc1_b_ocupacion" , 
+         bit_error_tiempo_lapiz      := "cnc1_bdt_lapiz" , 
+         bit_error_tiempo_sacapuntas := "cnc1_bdt_sacapuntas" , 
+         bit_error_tiempo_escuadra   := "cnc1_bdt_escuadra" , 
+         bit_error_tiempo_cartabon   := "cnc1_bdt_cartabon" , 
+         bit_error_config_lapiz      := "cnc1_bdc_lapiz" , 
+         bit_error_config_sacapuntas := "cnc1_bdc_sacapuntas" , 
+         bit_error_config_escuadra   := "cnc1_bdc_escuadra" , 
+         bit_error_config_cartabon   := "cnc1_bdc_cartabon" , 
+         bit_emer                    := "cnc1_b_emer"
+      );
+NETWORK
+TITLE = UP_CNC2
+      CALL "UP_CNC", "UP_CNC2_DB"
+      (  start                       := "gmm_bit_marcha" , 
+         emer                        := "cnc2_emer" , 
+         rearme                      := "cnc2_rearme" , 
+         cong                        := "gmm_bit_congelacion" , 
+         lapiz                       := "cnc2_lapiz" , 
+         sacapuntas                  := "cnc2_sacapuntas" , 
+         escuadra                    := "cnc2_escuadra" , 
+         cartabon                    := "cnc2_cartabon" , 
+         home                        := "cnc2_home" , 
+         tmax_cnc_lapiz              := "datosProduccion".tmax_cnc_lapiz , 
+         tmax_cnc_sacapuntas         := "datosProduccion".tmax_cnc_sacapuntas , 
+         tmax_cnc_escuadra           := "datosProduccion".tmax_cnc_escuadra , 
+         tmax_cnc_cartabon           := "datosProduccion".tmax_cnc_cartabon , 
+         temp_max                    := "cnc2_temp" , 
+         cnc_lapiz                   := "cnc2_cnc_lapiz" , 
+         cnc_sacapuntas              := "cnc2_cnc_sacapuntas" , 
+         cnc_escuadra                := "cnc2_cnc_escuadra" , 
+         cnc_cartabon                := "cnc2_cnc_cartabon" , 
+         bit_standby                 := "cnc2_b_standby" , 
+         bit_ocupacion               := "cnc2_b_ocupacion" , 
+         bit_error_tiempo_lapiz      := "cnc2_bdt_lapiz" , 
+         bit_error_tiempo_sacapuntas := "cnc2_bdt_sacapuntas" , 
+         bit_error_tiempo_escuadra   := "cnc2_bdt_escuadra" , 
+         bit_error_tiempo_cartabon   := "cnc2_bdt_cartabon" , 
+         bit_error_config_lapiz      := "cnc2_bdc_lapiz" , 
+         bit_error_config_sacapuntas := "cnc2_bdc_sacapuntas" , 
+         bit_error_config_escuadra   := "cnc2_bdc_escuadra" , 
+         bit_error_config_cartabon   := "cnc2_bdc_cartabon" , 
+         bit_emer                    := "cnc2_b_emer"
+      );
+NETWORK
+TITLE = UP_Simple_Efecto1
+      CALL "UP_Simple_Efecto", "UP_Simple_Efecto1_DB"
+      (  start                       := "gmm_bit_marcha" , 
+         emer                        := "sef1_emer" , 
+         cong                        := "gmm_bit_congelacion" , 
+         rearme                      := "sef1_rearme" , 
+         scomp                       := "sef1_scomp" , 
+         sexp                        := "sef1_sexp" , 
+         push                        := "sef1_push" , 
+         tiempo_max                  := "datosProduccion".tmax_simple_efecto , 
+         temp_max                    := "sef1_temp" , 
+         expandir                    := "sef1_expandir" , 
+         bit_standby                 := "sef1_b_standby" , 
+         bit_ocupacion               := "sef1_b_ocupacion" , 
+         bit_error_tiempo_expansion  := "sef1_bdt_expansion" , 
+         bit_error_tiempo_compresion := "sef1_bdt_compresion" , 
+         bit_error_config_expansion  := "sef1_bdc_expansion" , 
+         bit_error_config_compresion := "sef1_bdc_expansion" , 
+         bit_emer                    := "sef1_b_emer"
+      );
+NETWORK
+TITLE = UP_Palets_Vacios
+      CALL "UP_Palets_Vacios", "UP_Palets_Vacios_DB"
+      (  start                       := "gmm_bit_marcha" , 
+         emer                        := "pa_emer" , 
+         rearme                      := "pa_rearme" , 
+         cong                        := "gmm_bit_congelacion" , 
+         hraw                        := "pa_hraw" , 
+         LO_LIM                      := "datosProduccion".LO_LIM , 
+         HI_LIM                      := "datosProduccion".HI_LIM , 
+         hmin                        := "datosProduccion".hmin , 
+         hmax                        := "datosProduccion".hmax , 
+         recoger_pila                := "pa_recoger_pila" , 
+         pila_saturada               := "pa_pila_saturada" , 
+         error_medida                := "pa_error_medida" , 
+         h_real                      := "pa_hreal" , 
+         "h>hmin"                    := "pa_h>hmin" , 
+         "h>hmax"                    := "pa_h>hmax" , 
+         "h<hmin"                    := "pa_h<hmin"
+      );
+END_ORGANIZATION_BLOCK
+

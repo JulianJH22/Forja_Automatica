@@ -1,0 +1,13 @@
+﻿ORGANIZATION_BLOCK "init"
+TITLE = "Complete Restart"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+
+BEGIN
+NETWORK
+TITLE = Inicialización
+      SET;
+      S "x_marcha";
+      R "x_emer";
+END_ORGANIZATION_BLOCK
+

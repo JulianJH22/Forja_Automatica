@@ -1,0 +1,346 @@
+﻿DATA_BLOCK "UT_SFC_Cilindro_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"SFC_Cilindro"
+
+BEGIN
+
+END_DATA_BLOCK
+
+DATA_BLOCK "UT_SFC_Programa_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"SFC_Programa"
+
+BEGIN
+
+END_DATA_BLOCK
+
+DATA_BLOCK "UT_UP_CNC_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"UP_CNC"
+
+BEGIN
+
+END_DATA_BLOCK
+
+DATA_BLOCK "UT_UP_Palets_Vacios_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"UP_Palets_Vacios"
+
+BEGIN
+
+END_DATA_BLOCK
+
+DATA_BLOCK "UT_UP_Robot_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"UP_Robot"
+
+BEGIN
+
+END_DATA_BLOCK
+
+DATA_BLOCK "UT_UP_Simple_Efecto_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"UP_Simple_Efecto"
+
+BEGIN
+
+END_DATA_BLOCK
+
+FUNCTION "UT_CNC" : Void
+TITLE = Test unitario UP_CNC
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+//Test unitario para el CNC.
+//
+//¿Cómo ejecutar el test unitario? Definir todos los parámetros de la UP_CNC y llamar al test desde el OB1.
+
+BEGIN
+NETWORK
+TITLE = Llamada a UP_CNC
+//La unidad productiva está activa constantemente, por lo que basta con llamarla para que funcione.
+      CALL "UP_CNC", "UT_UP_CNC_DB"
+      (  start                       := "start" , 
+         emer                        := "ut_emer" , 
+         rearme                      := "ut_rearme" , 
+         cong                        := "ut_cong" , 
+         lapiz                       := "cnc1_lapiz" , 
+         sacapuntas                  := "cnc1_sacapuntas" , 
+         escuadra                    := "cnc1_escuadra" , 
+         cartabon                    := "cnc1_cartabon" , 
+         home                        := "cnc1_home" , 
+         tmax_cnc_lapiz              := s5t#10s , 
+         temp_max                    := "cnc1_temp" , 
+         cnc_lapiz                   := "cnc1_cnc_lapiz" , 
+         cnc_sacapuntas              := "cnc1_cnc_sacapuntas" , 
+         cnc_escuadra                := "cnc1_cnc_escuadra" , 
+         cnc_cartabon                := "cnc1_cnc_cartabon" , 
+         bit_standby                 := "cnc1_b_standby" , 
+         bit_ocupacion               := "cnc1_b_ocupacion" , 
+         bit_error_tiempo_lapiz      := "cnc1_bdt_lapiz" , 
+         bit_error_tiempo_sacapuntas := "cnc1_bdt_sacapuntas" , 
+         bit_error_tiempo_escuadra   := "cnc1_bdt_escuadra" , 
+         bit_error_tiempo_cartabon   := "cnc1_bdt_cartabon" , 
+         bit_error_config_lapiz      := "cnc1_bdc_lapiz" , 
+         bit_error_config_sacapuntas := "cnc1_bdc_sacapuntas" , 
+         bit_error_config_escuadra   := "cnc1_bdc_escuadra" , 
+         bit_error_config_cartabon   := "cnc1_bdc_cartabon" , 
+         bit_emer                    := "cnc1_b_emer"
+      );
+END_FUNCTION
+
+FUNCTION "UT_Palets_Vacios" : Void
+TITLE = Test unitario palets vacíos
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+
+BEGIN
+NETWORK
+TITLE = Llamada a la unidad productiva UP_Palets_Vacios
+      CALL "UP_Palets_Vacios", "UT_UP_Palets_Vacios_DB"
+      (  start                       := "start" , 
+         emer                        := "ut_emer" , 
+         rearme                      := "ut_rearme" , 
+         cong                        := "ut_cong" , 
+         hraw                        := "pa_hraw" , 
+         LO_LIM                      := "datosProduccion".LO_LIM , 
+         HI_LIM                      := "datosProduccion".HI_LIM , 
+         hmin                        := "datosProduccion".hmin , 
+         hmax                        := "datosProduccion".hmax , 
+         recoger_pila                := "pa_recoger_pila" , 
+         pila_saturada               := "pa_pila_saturada" , 
+         error_medida                := "pa_error_medida" , 
+         h_real                      := "pa_hreal" , 
+         "h>hmin"                    := "pa_h>hmin" , 
+         "h>hmax"                    := "pa_h>hmax" , 
+         "h<hmin"                    := "pa_h<hmin"
+      );
+END_FUNCTION
+
+FUNCTION "UT_Robot" : Void
+TITLE = Test unitario UP_Robot
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+//Test unitario para el robot.
+//
+//¿Cómo ejecutar el test unitario? Definir todos los parámetros de la UP_Robot y llamar al test desde el OB1.
+
+BEGIN
+NETWORK
+TITLE = Llamada a UP_Robot
+//La unidad productiva está activa constantemente, por lo que basta con llamarla para que funcione.
+      CALL "UP_Robot", "UT_UP_Robot_DB"
+      (  start                       := "start" , 
+         emer                        := "ut_emer" , 
+         rearme                      := "ut_rearme" , 
+         cong                        := "ut_cong" , 
+         dc                          := "robot1_dc" , 
+         fin_p                       := "robot1_fin_p" , 
+         home                        := "robot1_home" , 
+         tiempo_max                  := s5t#10s , 
+         temp_max                    := "robot1_temp" , 
+         cargar                      := "robot1_cargar" , 
+         descargar                   := "robot1_descargar" , 
+         bit_standby                 := "robot1_b_standby" , 
+         bit_ocupacion               := "robot1_b_ocupacion" , 
+         bit_error_tiempo_carga      := "robot1_bdt_carga" , 
+         bit_error_tiempo_descarga   := "robot1_bdt_descarga" , 
+         bit_error_config_carga      := "robot1_bdc_carga" , 
+         bit_error_config_descarga   := "robot1_bdt_descarga" , 
+         bit_emer                    := "robot1_b_emer"
+      );
+END_FUNCTION
+
+FUNCTION "UT_SFC_Cilindro" : Void
+TITLE = Test unitario maniobra SFC_Cilindro
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+//Test unitario de SFC_Cilindro. 
+//Es necesario probarla dentro de un grafcet para asegurarse que los bits de maniobra y de error síncrono funcionan bien.
+//Los parámetros que no pertenecen a la maniobra son los siguientes:
+//- x0: estado inicial.
+//- m1: bit de maniobra (determina cuándo está activa la maniobra).
+//- x2: estado final (tras terminar la maniobra).
+//- x10: estados de error síncrono.
+//- r1: receptividad entre x0 y m1.
+//- r2: receptividad entre x2 y x0.
+//- rearme: receptividad entre x10 y x0.
+//
+//¿Cómo ejecutar el test unitario? Se definen los parámetros indicados anteriormente y los parámetros de la maniobra. Luego se llama al FC.
+
+BEGIN
+NETWORK
+TITLE = x0 -> m1
+      U "ut_x0";
+      U "ut_r1";
+      S "ut_m1"               ;//Bit de maniobra
+      R "ut_x0";
+NETWORK
+TITLE = Llamada a la maniobra
+//Como se trata de un test unitario, no se distingue entre estados de error síncrono por tiempo y por mala configuración inicial. 
+//El tiempo de error se definiría en un bloque de datos, pero para realizar el test basta con indicar un valor cualquiera y ver que temporiza adecuadamente.
+      U "ut_m1";
+
+      SPBN _man;
+
+      CALL "SFC_Cilindro", "UT_SFC_Cilindro_DB"
+      (  sini                        := "ut_sini" , 
+         sfin                        := "ut_sfin" , 
+         reset                       := "ut_reset" , 
+         tiempo_error                := s5t#10s , 
+         temp_error                  := "ut_temp" , 
+         bit_fin                     := "ut_bdf" , 
+         bit_error_tiempo            := "ut_bdt" , 
+         bit_error_config            := "ut_bdc" , 
+         bit_ocupacion               := "ut_bdo" , 
+         actuador                    := "ut_actuador1"
+      );
+
+
+      U "ut_bdt";
+      S "ut_x10";
+      R "ut_m1";
+
+      U "ut_bdc";
+      S "ut_x10";
+      R "ut_m1";
+
+      U "ut_bdf";
+      S "ut_x2";
+      R "ut_m1";
+
+_man:      NOP 0;
+NETWORK
+TITLE = x2 -> x0
+//Vuelta al estado inicial
+      U "ut_x2";
+      U "ut_r2";
+      S "ut_x0";
+      R "ut_x2";
+NETWORK
+TITLE = x10 -> x0
+//Rearme del error síncrono
+      U "ut_x10";
+      U "ut_rearme";
+      S "ut_x0";
+      R "ut_x10";
+END_FUNCTION
+
+FUNCTION "UT_SFC_Programa" : Void
+TITLE = Test unitario maniobra SFC_Programa
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+//Test unitario de SFC_Programa. 
+//Es necesario probarla dentro de un grafcet para asegurarse que los bits de maniobra y de error síncrono funcionan bien.
+//Los parámetros que no pertenecen a la maniobra son los siguientes:
+//- x0: estado inicial.
+//- m1: bit de maniobra (determina cuándo está activa la maniobra).
+//- x2: estado final (tras terminar la maniobra).
+//- x10: estados de error síncrono.
+//- r1: receptividad entre x0 y m1.
+//- r2: receptividad entre x2 y x0.
+//- rearme: receptividad entre x10 y x0.
+//
+//¿Cómo ejecutar el test unitario? Se definen los parámetros indicados anteriormente y los parámetros de la maniobra. Luego se llama al FC.
+
+BEGIN
+NETWORK
+TITLE = x0 -> m1
+      U "ut_x0";
+      U "ut_r1";
+      S "ut_m1"               ;//Bit de maniobra
+      R "ut_x0";
+NETWORK
+TITLE = Llamada a la maniobra
+//Como se trata de un test unitario, no se distingue entre estados de error síncrono por tiempo y por mala configuración inicial. 
+//El tiempo de error se definiría en un bloque de datos, pero para realizar el test basta con indicar un valor cualquiera y ver que temporiza adecuadamente.
+      U "ut_m1";
+
+      SPBN _man;
+
+      CALL "SFC_Programa", "UT_SFC_Programa_DB"
+      (  sensor1                     := "ut_s1" , 
+         sensor2                     := "ut_s2" , 
+         reset                       := "ut_reset" , 
+         tiempo_error                := s5t#10s , 
+         temp_error                  := "ut_temp" , 
+         bit_fin                     := "ut_bdf" , 
+         bit_error_tiempo            := "ut_bdf" , 
+         bit_error_config            := "ut_bdc" , 
+         bit_ocupacion               := "ut_bdo" , 
+         actuador1                   := "ut_actuador1"
+      );
+
+      U "ut_bdt";
+      S "ut_x10";
+      R "ut_m1";
+
+      U "ut_bdc";
+      S "ut_x10";
+      R "ut_m1";
+
+      U "ut_bdf";
+      S "ut_x2";
+      R "ut_m1";
+
+_man:      NOP 0;
+NETWORK
+TITLE = x2 -> x0
+//Vuelta al estado inicial
+      U "ut_x2";
+      U "ut_r2";
+      S "ut_x0";
+      R "ut_x2";
+NETWORK
+TITLE = x10 -> x0
+//Rearme del error síncrono
+      U "ut_x10";
+      U "ut_rearme";
+      S "ut_x0";
+      R "ut_x10";
+END_FUNCTION
+
+FUNCTION "UT_Simple_Efecto" : Void
+TITLE = Test unitario UP_Simple_Efecto
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+//Test unitario para el cilindro de simple efecto.
+//
+//¿Cómo ejecutar el test unitario? Definir todos los parámetros de la UP_Simple_Efecto y llamar al test desde el OB1.
+
+BEGIN
+NETWORK
+TITLE = Llamada a UP_Simple_Efecto
+//La unidad productiva está activa constantemente, por lo que basta con llamarla para que funcione.
+      CALL "UP_Simple_Efecto", "UT_UP_Simple_Efecto_DB"
+      (  start                       := "start" , 
+         emer                        := "ut_emer" , 
+         cong                        := "ut_cong" , 
+         rearme                      := "ut_rearme" , 
+         scomp                       := "sef1_scomp" , 
+         sexp                        := "sef1_sexp" , 
+         push                        := "sef1_push" , 
+         tiempo_max                  := s5t#10s , 
+         temp_max                    := "sef1_temp" , 
+         expandir                    := "sef1_expandir" , 
+         bit_standby                 := "sef1_b_standby" , 
+         bit_ocupacion               := "sef1_b_ocupacion" , 
+         bit_error_tiempo_expansion  := "sef1_bdt_expansion" , 
+         bit_error_tiempo_compresion := "sef1_bdt_compresion" , 
+         bit_error_config_expansion  := "sef1_bdc_expansion" , 
+         bit_error_config_compresion := "sef1_bdc_compresion" , 
+         bit_emer                    := "sef1_b_emer"
+      );
+END_FUNCTION
+

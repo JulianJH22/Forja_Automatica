@@ -1,0 +1,224 @@
+﻿FUNCTION_BLOCK "GEMER_Local"
+TITLE = Grafcet de emergencia local robot
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+//Se encarga de forzar al estado de emergencia a las unidades productivas a las que controle. Se ha implementado en un FB porque tiene estados internos locales (los estados de GEMER_Global son globales y, además, es requisito del trabajo implementar dicho bloque como FC sin parámetros). 
+//Se reutilizará esta función con cada una de las unidades productivas, con la diferencia de que se llamará cada vez a un bloque de datos diferente.
+//Presenta la siguiente interfaz:
+//- Emer: informa de emergencia global o local.
+//- Rearme: rearme global o local.
+//- Bit_emer: informa que la función se encuentra en estado de emergencia.
+//- X_marcha: estado de marcha.
+//- X_emer: estado de emergencia.
+//- Bit_trabajo: controla la conexión del bloque.
+//
+   VAR_INPUT 
+      emer : Bool;
+      rearme : Bool;
+   END_VAR
+
+   VAR_OUTPUT 
+      bit_emer : Bool;
+   END_VAR
+
+   VAR 
+      x_marcha : Bool;
+      x_emer : Bool;
+      bit_trabajo : Bool;
+   END_VAR
+
+
+BEGIN
+NETWORK
+TITLE = Plantilla de conexión
+//Solamente se ejecuta una vez (la función no se desconecta) con el inicio del programa (OB100). 
+      SET;
+      FP #bit_trabajo;
+      S #x_marcha;
+      R #x_emer;
+NETWORK
+TITLE = Plantilla de forzado - Emergencia
+      U #emer;
+      S #x_emer;
+      R #x_marcha;
+      = #bit_emer;
+      BEB;
+NETWORK
+TITLE = x_marcha -> x_emer
+      U #x_marcha;
+      U #emer;
+      S #x_emer;
+      R #x_marcha;
+NETWORK
+TITLE = x_emer -> x_marcha
+      U #x_emer;
+      UN #emer;
+      U #rearme;
+      S #x_marcha;
+      R #x_emer;
+NETWORK
+TITLE = Tratamiento estado de emergencia
+      U #x_emer;
+      = #bit_emer;
+END_FUNCTION_BLOCK
+
+DATA_BLOCK "GEMER_CNC1_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"GEMER_Local"
+
+BEGIN
+
+END_DATA_BLOCK
+
+DATA_BLOCK "GEMER_CNC2_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"GEMER_Local"
+
+BEGIN
+
+END_DATA_BLOCK
+
+DATA_BLOCK "GEMER_Robot1_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"GEMER_Local"
+
+BEGIN
+
+END_DATA_BLOCK
+
+DATA_BLOCK "GEMER_Robot2_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"GEMER_Local"
+
+BEGIN
+
+END_DATA_BLOCK
+
+DATA_BLOCK "GEMER_Simple_Efecto1_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"GEMER_Local"
+
+BEGIN
+
+END_DATA_BLOCK
+
+FUNCTION "GEMER_Global" : Void
+TITLE = Emergencia global
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+//Se encarga de coordinar la emergencia global en toda la celda, llamando a los bloques de emergencia locales. Usa variables absolutas (FC sin parámetros y que controla estados globales).  Se inicia directamente en estado de marcha con el OB100.
+
+BEGIN
+NETWORK
+TITLE = x_marcha -> x_emer
+      U "x_marcha";
+      U "emer";
+      S "x_emer";
+      R "x_marcha";
+NETWORK
+TITLE = x_emer -> x_marcha
+      U "x_emer";
+      UN "emer";
+      U "rearme";
+      S "x_marcha";
+      R "x_emer";
+
+      SPBN _rearme;
+
+      CALL "GEMER_Local", "GEMER_Robot1_DB"
+      (  emer                        := FALSE , 
+         rearme                      := TRUE , 
+         bit_emer                    := "robot1_emer"
+      );
+
+      CALL "GEMER_Local", "GEMER_Robot2_DB"
+      (  emer                        := FALSE , 
+         rearme                      := TRUE , 
+         bit_emer                    := "robot2_emer"
+      );
+
+      CALL "GEMER_Local", "GEMER_CNC1_DB"
+      (  emer                        := FALSE , 
+         rearme                      := TRUE , 
+         bit_emer                    := "cnc1_emer"
+      );
+
+      CALL "GEMER_Local", "GEMER_CNC2_DB"
+      (  emer                        := FALSE , 
+         rearme                      := TRUE , 
+         bit_emer                    := "cnc2_emer"
+      );
+
+      CALL "GEMER_Local", "GEMER_Simple_Efecto1_DB"
+      (  emer                        := FALSE , 
+         rearme                      := TRUE , 
+         bit_emer                    := "sef1_emer"
+      );
+
+_rearme:      NOP 0;
+NETWORK
+TITLE = Emergencia
+      U "x_emer";
+
+      SPBN _emergencia;
+
+      CALL "GEMER_Local", "GEMER_Robot1_DB"
+      (  emer                        := TRUE , 
+         rearme                      := FALSE , 
+         bit_emer                    := "robot1_emer"
+      );
+
+      CALL "GEMER_Local", "GEMER_Robot2_DB"
+      (  emer                        := TRUE , 
+         rearme                      := FALSE , 
+         bit_emer                    := "robot2_emer"
+      );
+
+      CALL "GEMER_Local", "GEMER_CNC1_DB"
+      (  emer                        := TRUE , 
+         rearme                      := FALSE , 
+         bit_emer                    := "cnc1_emer"
+      );
+
+      CALL "GEMER_Local", "GEMER_CNC2_DB"
+      (  emer                        := TRUE , 
+         rearme                      := FALSE , 
+         bit_emer                    := "cnc2_emer"
+      );
+
+      CALL "GEMER_Local", "GEMER_Simple_Efecto1_DB"
+      (  emer                        := TRUE , 
+         rearme                      := FALSE , 
+         bit_emer                    := "sef1_emer"
+      );
+
+      CALL "GMM", "GMM_DB"
+      (  emer                        := TRUE , 
+         bit_paro                    := "gmm_bit_paro" , 
+         bit_marcha                  := "gmm_bit_marcha" , 
+         bit_congelacion             := "gmm_bit_congelacion"
+      );
+
+_emergencia:      NOP 0;
+END_FUNCTION
+
+DATA_BLOCK "GEMER_Local_Palets_Vacios_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"GEMER_Local"
+
+BEGIN
+
+END_DATA_BLOCK
+

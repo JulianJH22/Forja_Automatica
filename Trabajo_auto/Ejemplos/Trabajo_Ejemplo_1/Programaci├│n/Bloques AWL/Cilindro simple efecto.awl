@@ -1,0 +1,323 @@
+﻿FUNCTION_BLOCK "UP_Simple_Efecto"
+TITLE = Unidad productiva cilindro de simple efecto
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+//Gestiona el cilindro de simple efecto.
+//Presenta los siguientes parámetros:
+//- start: inicia la unidad productiva.
+//- emer: señal de emergencia (error asíncrono).
+//- cong: señal de congelación. 
+//- rearme: vuelta al estado de standby de un estado de error.
+//- scomp: cilindro comprimido.
+//- sexp: cilindro expandido.
+//- push: autorización para expandirse.
+//- tiempo_max: tiempo máximo para las maniobras.
+//- temp_max: temporizador de las manioabras.
+//- expandir: expande el cilindro (no hace falta actuador para comprimir porque es un simple efecto).
+//- bit_standby: estado de standby.
+//- bit_ocupación: el robot se encuentra en medio de una maniobra.
+//- bit_error_tiempo_expansión: error síncrono en la expansión.
+//- bit_error_tiempo_compresión: error síncrono en la compresión.
+//- bit_error_config_expansión: error síncrono por mala configuración inicial en la expansión.
+//- bit_error_config_compresión: error síncrono por mala configuración inicial en la compresión.
+//- bit_emer: estado de emergencia.
+//- bit_trabajo: se encarga de la conexión de la unidad productiva.
+//- x_expansión: estado de expansión.
+//- x_compresión: estado de compresión.
+//- x_standby: estado de standby.
+//- x_error_tiempo_expansión: estado de error síncrono en la expansión.
+//- x_error_tiempo_compresión: estado de error síncrono en la compresión.
+//- x_error_config_expansión: estado de error síncrono por mala configuración inicial en la expansión.
+//- x_error_config_compresión: estado de error síncrono por mala configuración inicial en la compresión.
+//- x_emer: estado de error asíncrono.
+//- SFC_Expansion: maniobra de expansión.
+//- SFC_Compresión: maniobra de compresión (sin actuador).
+//- bit_fin_expansión: finalización de la expansión.
+//- bit_fin_compresión: finalización de la compresión. 
+//
+//
+//No se tiene un actuador "compresion" porque el cilindro es un simple efecto. No actuar sobre el cilindro supone la compresión. Si se definiese un estado de compresión, habría conflictos porque al entrar en emergencia, se llamaría al mismo actuador con "expansion" = 1 y "compresion" = 1.
+//Sin embargo, es necesario llamar a la maniobra de compresión para encapsularla y gestionar errores por tiempo y mala configuración inicial.
+   VAR_INPUT 
+      start : Bool;
+      emer : Bool;
+      cong : Bool;
+      rearme : Bool;
+      scomp : Bool;
+      sexp : Bool;
+      push : Bool;
+      tiempo_max : S5Time;
+      temp_max : Timer;
+   END_VAR
+
+   VAR_OUTPUT 
+      expandir : Bool;
+      bit_standby : Bool;
+      bit_ocupacion : Bool;
+      bit_error_tiempo_expansion : Bool;
+      bit_error_tiempo_compresion : Bool;
+      bit_error_config_expansion : Bool;
+      bit_error_config_compresion : Bool;
+      bit_emer : Bool;
+   END_VAR
+
+   VAR 
+      bit_trabajo : Bool;
+      x_expansion : Bool;
+      x_compresion : Bool;
+      x_standby : Bool;
+      x_error_tiempo_expansion : Bool;
+      x_error_tiempo_compresion : Bool;
+      x_error_config_expansion : Bool;
+      x_error_config_compresion : Bool;
+      x_emer : Bool;
+      SFC_Expansion : "SFC_Cilindro";
+      SFC_Compresion : "SFC_Cilindro";
+   END_VAR
+
+   VAR_TEMP 
+      bit_fin_expansion : Bool;
+      bit_fin_compresion : Bool;
+   END_VAR
+
+
+BEGIN
+NETWORK
+TITLE = Plantilla de emergencia - Error asíncrono
+//Si se está en un estado de error síncrono no se entra en emergencia.
+      O #x_standby;
+      O #x_expansion;
+      O #x_compresion;
+      U #emer;
+      S #x_emer;
+      R #x_standby;
+      R #x_compresion;
+      R #x_expansion;
+
+      SPBN _emer;
+
+      CALL #SFC_Expansion
+      (  reset                       := TRUE , 
+         actuador                    := #expandir
+      );
+
+
+      CALL #SFC_Compresion
+      (  reset                       := TRUE
+      );
+
+_emer:      NOP 0;
+
+      O #x_standby;
+      O #x_expansion;
+      O #x_compresion;
+      U #emer;
+      BEB;
+NETWORK
+TITLE = Plantilla de desconexión - STOP
+//Desconexión de la unidad productiva. 
+//Reinicia todos los parámetros para futuras conexiones.
+//Llamada a las maniobras usando la entrada asíncrona para indicar su pausa.
+//Después de la caja de código se especifica la instrucción “UN #start”, que coincide con la instrucción con la que se activó la plantilla. Esto es porque después de la caja, la RLO = 1 y /ER = 0. Por lo tanto, si la plantilla no se ejecuta, tras saltar la caja de código la RLO = 1 cuando debería ser 0 (UN #start no se cumple).
+      UN #start;
+      R #bit_trabajo;
+      R #bit_emer;
+      R #bit_error_config_expansion;
+      R #bit_error_config_compresion;
+      R #bit_error_tiempo_expansion;
+      R #bit_error_tiempo_compresion;
+      R #bit_standby;
+      R #bit_ocupacion;
+      R #temp_max;
+      FR #temp_max;
+
+      SPBN stop;
+
+      CALL #SFC_Expansion
+      (  reset                       := TRUE , 
+         actuador                    := #expandir
+      );
+
+
+      CALL #SFC_Compresion
+      (  reset                       := TRUE
+      );
+
+stop:      NOP 0;
+
+      UN #start;
+      BEB;
+NETWORK
+TITLE = Plantilla de conexión
+//Conexión de la unidad productiva.
+      U #start;
+      FP #bit_trabajo;
+      S #x_standby;
+      R #x_expansion;
+      R #x_compresion;
+      R #x_emer;
+      R #x_error_config_expansion;
+      R #x_error_config_compresion;
+      R #x_error_tiempo_expansion;
+      R #x_error_tiempo_compresion;
+NETWORK
+TITLE = Plantilla de congelación
+//Congela la unidad productiva: habilitación de componentes y reset de actuadores.
+//Los estados no cambian y no se va a un estado especial, de forma que cuando se quite la congelación la unidad productiva vuelva a la etapa en la que estaba.
+//Se repite el estímulo de activación para saltar el resto de segmentos.
+//No se llama al actuador de compresión porque no existe.
+      U #cong;
+
+      SPBN _cong;
+
+      R #temp_max;//Habilitación de componentes
+      FR #temp_max;
+
+      CALL #SFC_Expansion
+      (  reset                       := TRUE , 
+         actuador                    := #expandir
+      );
+
+      CALL #SFC_Compresion
+      (  reset                       := TRUE
+      );
+
+_cong:      NOP 0;
+
+      U #cong;//Repetición del estímulo de activación
+      BEB;
+NETWORK
+TITLE = Salida del estado de emergencia
+//Rearme
+      U #x_emer;
+      UN #emer;
+      U #rearme;
+      S #x_standby;
+      R #x_emer;
+NETWORK
+TITLE = Rearme errores síncronos
+//Se considera la posibilidad de rearme tras errores síncronos.
+      O #x_error_config_expansion;
+      O #x_error_config_compresion;
+      O #x_error_tiempo_expansion;
+      O #x_error_tiempo_compresion;
+      U #rearme;
+      S #x_standby;
+      R #x_error_config_expansion;
+      R #x_error_config_compresion;
+      R #x_error_tiempo_expansion;
+      R #x_error_tiempo_compresion;
+NETWORK
+TITLE = x_standby -> x_expansion
+      U #x_standby;
+      U #push;
+      S #x_expansion;
+      R #x_standby;
+NETWORK
+TITLE = Llamada a la maniobra de expansión
+//Entrada de error asíncrono false (se gestiona en la plantilla de desconexión).
+      U #x_expansion;
+
+      SPBN _exp;
+      CALL #SFC_Expansion
+      (  sini                        := #scomp , 
+         sfin                        := #sexp , 
+         reset                       := FALSE , 
+         tiempo_error                := #tiempo_max , 
+         temp_error                  := #temp_max , 
+         bit_fin                     := #bit_fin_expansion , 
+         bit_error_tiempo            := #bit_error_tiempo_expansion , 
+         bit_error_config            := #bit_error_config_expansion , 
+         bit_ocupacion               := #bit_ocupacion , 
+         actuador                    := #expandir
+      );
+
+
+      U #bit_error_tiempo_expansion;
+      S #x_error_tiempo_expansion;
+      R #x_expansion;
+
+      U #bit_error_config_expansion;
+      S #x_error_config_expansion;
+      R #x_expansion;
+
+      U #bit_fin_expansion;
+      S #x_compresion;
+      R #x_expansion;
+
+_exp:      NOP 0;
+
+NETWORK
+TITLE = Llamada a la maniobra de compresión
+//No se indica actuador por ser un cilindro de simple efecto. Si no se actúa sobre el cilindro, este se comprime.
+      U #x_compresion;
+
+      SPBN _comp;
+      CALL #SFC_Compresion
+      (  sini                        := #sexp , 
+         sfin                        := #scomp , 
+         reset                       := FALSE , 
+         tiempo_error                := #tiempo_max , 
+         temp_error                  := #temp_max , 
+         bit_fin                     := #bit_fin_compresion , 
+         bit_error_tiempo            := #bit_error_tiempo_compresion , 
+         bit_error_config            := #bit_error_config_compresion , 
+         bit_ocupacion               := #bit_ocupacion
+      );
+
+      U #bit_error_tiempo_compresion;
+      S #x_error_tiempo_compresion;
+      R #x_compresion;
+
+      U #bit_error_config_compresion;
+      S #x_error_config_compresion;
+      R #x_compresion;
+
+      U #bit_fin_compresion;
+      S #x_standby;
+      R #x_compresion;
+
+_comp:      NOP 0;
+
+NETWORK
+TITLE = Bit de standby
+//Indica el estado de standby.
+      U #x_standby;
+      = #bit_standby;
+NETWORK
+TITLE = Bit de emergencia
+//Indica el estado de emergencia.
+      U #x_emer;
+      = #bit_emer;
+NETWORK
+TITLE = Bit error tiempo expansión
+//Indica el estado de error síncrono por tiempo de expansión.
+      U #x_error_tiempo_expansion;
+      = #bit_error_tiempo_expansion;
+NETWORK
+TITLE = Bit error tiempo compresión
+//Indica el estado de error síncrono por tiempo de compresión.
+      U #x_error_tiempo_compresion;
+      = #bit_error_tiempo_compresion;
+NETWORK
+TITLE = Bit error config expansión
+//Indica el estado de error síncrono por mala configuración inicial en la expansión.
+      U #x_error_config_expansion;
+      = #bit_error_config_expansion;
+NETWORK
+TITLE = Bit error config compresión
+//Indica el estado de error síncrono por mala configuración inicial en la compresión.
+      U #x_error_config_compresion;
+      = #bit_error_config_compresion;
+END_FUNCTION_BLOCK
+
+DATA_BLOCK "UP_Simple_Efecto1_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"UP_Simple_Efecto"
+
+BEGIN
+
+END_DATA_BLOCK
+

@@ -1,0 +1,233 @@
+﻿FUNCTION_BLOCK "GMM"
+TITLE = Grafcet modos de marcha
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+//Se encarga de determinar los modos de marcha (lote pequeño, lote mediano, lote grande o congelación). Cuando se encuentra en marcha las unidades productivas están activas; cuando está en parada se desconectan. Se inicia con el OB100 y permanece siempre activo. Presenta la siguiente interfaz:
+//- On: pasa al estado de marcha.
+//- Lote_pequenio: los lotes a procesar son pequeños.
+//- Lote_mediano: los lotes a procesar son medianos.
+//- Lote grande: los lotes a procesar son grandes.
+//- Mcong: modo de marcha con congelación.
+//- Cong: señal de congelación.
+//- Emer: señal de emergencia.
+//- Bit_paro: indica que el bloque se encuentra en paro.
+//- Bit_marcha: indica que el bloque está en marcha (si no está en parada).
+//- Bit_congelacion: indica que el bloque está en estado de congelación.
+//- X_parada: estado de parada.
+//- X_marcha: estado de marcha.
+//- X_lote_pequenio: estado de producción de lotes pequeños.
+//- X_lote_mediano: estado de producción de lotes medianos.
+//- X_lote_grande: estado de producción de lotes grandes.
+//- X_mcong: estado de marcha con posibilidad de congelación.
+//- X_cong: estado de congelación.
+//- Bit_trabajo: controla la conexión del bloque.
+//
+   VAR_INPUT 
+      on : Bool;
+      lote_pequenio : Bool;
+      lote_mediano : Bool;
+      lote_grande : Bool;
+      mcong : Bool;
+      cong : Bool;
+      emer : Bool;
+   END_VAR
+
+   VAR_OUTPUT 
+      bit_paro : Bool;
+      bit_marcha : Bool;
+      bit_congelacion : Bool;
+   END_VAR
+
+   VAR 
+      x_parada : Bool;
+      x_marcha : Bool;
+      x_lote_pequenio : Bool;
+      x_lote_mediano : Bool;
+      x_lote_grande : Bool;
+      x_mcong : Bool;
+      x_cong : Bool;
+      bit_trabajo : Bool;
+   END_VAR
+
+
+BEGIN
+NETWORK
+TITLE = Plantilla de conexión
+//Conecta el bloque con el inicio del programa en el OB100. Solo se ejecuta una vez la plantilla de conexión. 
+      SET;
+      FP #bit_trabajo;
+      S #x_parada;
+      R #x_marcha;
+      R #x_lote_pequenio;
+      R #x_lote_mediano;
+      R #x_lote_grande;
+      R #x_cong;
+NETWORK
+TITLE = Plantilla de forzado - Error asíncrono
+//En caso de emergencia global, se fuerza al estado de parada y se reinician los demás estados. 
+      U #emer;
+      S #x_parada;
+      R #x_marcha;
+      R #x_lote_grande;
+      R #x_lote_mediano;
+      R #x_lote_pequenio;
+      R #x_mcong;
+      R #x_cong;
+      R #bit_marcha;
+      R #bit_congelacion;
+      BEB;
+NETWORK
+TITLE = x_parada -> x_marcha
+      U #x_parada;
+      U #on;
+      S #x_marcha;
+      R #x_parada;
+NETWORK
+TITLE = x_marcha -> x_parada
+      U #x_marcha;
+      U "cnc1_b_standby";
+      U "cnc2_b_standby";
+      U "robot1_b_standby";
+      U "robot2_b_standby";
+      U "sef1_b_standby";
+      UN #on;
+      S #x_parada;
+      R #x_marcha;
+NETWORK
+TITLE = x_marcha -> x_lote_pequenio
+      U #x_marcha;
+      U #lote_pequenio;
+      S #x_lote_pequenio;
+      R #x_marcha;
+NETWORK
+TITLE = x_marcha -> x_lote_mediano
+      U #x_marcha;
+      U #lote_mediano;
+      S #x_lote_mediano;
+      R #x_marcha;
+NETWORK
+TITLE = x_marcha -> x_lote_grande
+      U #x_marcha;
+      U #lote_grande;
+      S #x_lote_grande;
+      R #x_marcha;
+NETWORK
+TITLE = x_marcha -> x_mcong
+      U #x_marcha;
+      U #mcong;
+      S #x_mcong;
+      R #x_marcha;
+NETWORK
+TITLE = x_mcong -> x_cong
+      U #x_mcong;
+      U #cong;
+      S #x_cong;
+      R #x_mcong;
+NETWORK
+TITLE = x_lote_pequenio -> x_marcha
+      U #x_lote_pequenio;
+      UN #lote_pequenio;
+      S #x_marcha;
+      R #x_lote_pequenio;
+NETWORK
+TITLE = x_lote_mediano -> x_marcha
+      U #x_lote_mediano;
+      UN #lote_mediano;
+      S #x_marcha;
+      R #x_lote_mediano;
+NETWORK
+TITLE = x_lote_grande-> x_marcha
+      U #x_lote_grande;
+      UN #lote_grande;
+      S #x_marcha;
+      R #x_lote_grande;
+NETWORK
+TITLE = x_cong -> x_marcha
+      U #x_cong;
+      UN #mcong;
+      UN #cong;
+      S #x_marcha;
+      R #x_cong;
+NETWORK
+TITLE = x_cong -> x_mcong
+      U #x_cong;
+      UN #cong;
+      S #x_mcong;
+      R #x_cong;
+NETWORK
+TITLE = Tratamiento lote pequeño
+//Carga los datos de producción para lotes pequeños.
+      U #x_lote_pequenio;
+
+      SPBN _lotePequenio;
+
+      L "datosLotePequenio".tmax_cnc_lapiz;
+      T "datosProduccion".tmax_cnc_lapiz;
+      L "datosLotePequenio".tmax_cnc_sacapuntas;
+      T "datosProduccion".tmax_cnc_sacapuntas;
+      L "datosLotePequenio".tmax_cnc_escuadra;
+      T "datosProduccion".tmax_cnc_escuadra;
+      L "datosLotePequenio".tmax_cnc_cartabon;
+      T "datosProduccion".tmax_cnc_cartabon;
+
+_lotePequenio:      NOP 0;
+NETWORK
+TITLE = Tratamiento lote mediano
+//Carga los datos de producción para lotes medianos.
+      U #x_lote_mediano;
+
+      SPBN _loteMediano;
+
+      L "datosLoteMediano".tmax_cnc_lapiz;
+      T "datosProduccion".tmax_cnc_lapiz;
+      L "datosLoteMediano".tmax_cnc_sacapuntas;
+      T "datosProduccion".tmax_cnc_sacapuntas;
+      L "datosLoteMediano".tmax_cnc_escuadra;
+      T "datosProduccion".tmax_cnc_escuadra;
+      L "datosLoteMediano".tmax_cnc_cartabon;
+      T "datosProduccion".tmax_cnc_cartabon;
+
+_loteMediano:      NOP 0;
+NETWORK
+TITLE = Tratamiento lote grande
+//Carga los datos de producción para lotes grandes.
+      U #x_lote_grande;
+
+      SPBN _loteGrande;
+
+      L "datosLoteGrande".tmax_cnc_lapiz;
+      T "datosProduccion".tmax_cnc_lapiz;
+      L "datosLoteGrande".tmax_cnc_sacapuntas;
+      T "datosProduccion".tmax_cnc_sacapuntas;
+      L "datosLoteGrande".tmax_cnc_escuadra;
+      T "datosProduccion".tmax_cnc_escuadra;
+      L "datosLoteGrande".tmax_cnc_cartabon;
+      T "datosProduccion".tmax_cnc_cartabon;
+
+_loteGrande:      NOP 0;
+
+
+NETWORK
+TITLE = Bit de marcha
+      UN #x_parada;
+      = #bit_marcha;
+NETWORK
+TITLE = Bit de parada
+      U #x_parada;
+      = #bit_paro;
+NETWORK
+TITLE = Bit de congelación
+      U #x_cong;
+      = #bit_congelacion;
+END_FUNCTION_BLOCK
+
+DATA_BLOCK "GMM_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"GMM"
+
+BEGIN
+
+END_DATA_BLOCK
+

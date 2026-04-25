@@ -1,0 +1,366 @@
+﻿FUNCTION_BLOCK "UP_Robot"
+TITLE = Unidad productiva robot pick and place
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+//Gestiona el robot pick and place.
+//Presenta los siguientes parámetros:
+//- start: inicia la unidad productiva.
+//- emer: señal de emergencia (error asíncrono).
+//- cong: señal de congelación.
+//- rearme: vuelta al estado de standby de un estado de error.
+//- dc: señal de carga.
+//- fin_p: señal de descarga.
+//- home: indica el estado en la posición fetal.
+//- tiempo_max: tiempo máximo para las maniobras.
+//- temp_max: temporizador de las manioabras.
+//- cargar: programa de carga.
+//- descargar: programa de descarga.
+//- bit_standby: estado de standby.
+//- bit_ocupación: el robot se encuentra en medio de una maniobra.
+//- bit_error_tiempo_carga: error síncrono en la carga.
+//- bit_error_tiempo_descarga: error síncrono en la descarga.
+//- bit_error_config_carga: error síncrono por mala configuración inicial en la carga.
+//- bit_error_config_descarga: error síncrono por mala configuración inicial en la descarga.
+//- bit_emer: estado de emergencia.
+//- bit_trabajo: se encarga de la conexión de la unidad productiva.
+//- x_carga: estado de carga.
+//- x_descarga: estado de descarga.
+//- x_standby: estado de standby.
+//- x_error_tiempo_carga: estado de error síncrono en la carga.
+//- x_error_tiempo_descarga: estado de error síncrono en la descarga.
+//- x_error_config_carga: estado de error síncrono por mala configuración inicial en la carga.
+//- x_error_config_descarga: estado de error síncrono por mala configuración inicial en la descarga.
+//- x_espera_home_carga: estado transitorio entre la maniobra de carga y el estado de standby.
+//- x_espera_home_descarga: estado transitorio entre la maniobra de descarga y el estado de standby.
+//- SFC_Programa_Carga: maniobra de carga de tipo SFC_Programa con bloque de datos multiinstancia.
+//- SFC_Programa_ Descarga: maniobra de descarga de tipo SFC_Programa con bloque de datos multiinstancia.
+//- bit_fin_carga: finalización de la carga.
+//- bit_fin_descarga: finalización de la descarga. 
+//
+//Las variables "bit_fin_carga" y "bit_fin_descarga" son temporales porque las unidades productivas están pensadas para estar trabajando constantemente.
+   VAR_INPUT 
+      start : Bool;
+      emer : Bool;
+      rearme : Bool;
+      cong : Bool;
+      dc : Bool;
+      fin_p : Bool;
+      home : Bool;
+      tiempo_max : S5Time;
+      temp_max : Timer;
+   END_VAR
+
+   VAR_OUTPUT 
+      cargar : Bool;
+      descargar : Bool;
+      bit_standby : Bool;
+      bit_ocupacion : Bool;
+      bit_error_tiempo_carga : Bool;
+      bit_error_tiempo_descarga : Bool;
+      bit_error_config_carga : Bool;
+      bit_error_config_descarga : Bool;
+      bit_emer : Bool;
+   END_VAR
+
+   VAR 
+      bit_trabajo : Bool;
+      x_carga : Bool;
+      x_descarga : Bool;
+      x_standby : Bool;
+      x_error_tiempo_carga : Bool;
+      x_error_tiempo_descarga : Bool;
+      x_error_config_carga : Bool;
+      x_error_config_descarga : Bool;
+      x_espera_home_carga : Bool;
+      x_espera_home_descarga : Bool;
+      x_emer : Bool;
+      SFC_Programa_Carga : "SFC_Programa";
+      SFC1_Programa_Descarga : "SFC_Programa";
+   END_VAR
+
+   VAR_TEMP 
+      bit_fin_carga : Bool;
+      bit_fin_descarga : Bool;
+   END_VAR
+
+
+BEGIN
+NETWORK
+TITLE = Plantilla de desconexion - Error asíncrono
+//Si se está en un estado de error síncrono no se entra en emergencia.
+      O #x_standby;
+      O #x_carga;
+      O #x_descarga;
+      U #emer;
+      S #x_emer;
+      R #x_standby;
+      R #x_carga;
+      R #x_descarga;
+
+      SPBN _emer;
+
+      CALL #SFC_Programa_Carga
+      (  reset                       := true , 
+         temp_error                  := #temp_max , 
+         bit_fin                     := #bit_fin_carga , 
+         bit_ocupacion               := #bit_ocupacion , 
+         actuador1                   := #cargar
+      );
+
+      CALL #SFC1_Programa_Descarga
+      (  reset                       := true , 
+         temp_error                  := #temp_max , 
+         bit_fin                     := #bit_fin_descarga , 
+         bit_ocupacion               := #bit_ocupacion , 
+         actuador1                   := #descargar
+      );
+
+_emer:      NOP 0;
+
+      O #x_standby;
+      O #x_carga;
+      O #x_descarga;
+      U #emer;
+      BEB;
+NETWORK
+TITLE = Plantilla de desconexión - STOP
+//Desconexión de la unidad productiva. 
+//Reinicia todos los parámetros para futuras conexiones.
+//Llamada a las maniobras usando la entrada asíncrona para indicar su pausa.
+//Después de la caja de código se especifica la instrucción “UN #start”, que coincide con la instrucción con la que se activó la plantilla. Esto es porque después de la caja, la RLO = 1 y /ER = 0. Por lo tanto, si la plantilla no se ejecuta, tras saltar la caja de código la RLO = 1 cuando debería ser 0 (UN #start no se cumple).
+      UN #start;
+      R #bit_trabajo;
+      R #bit_emer;
+      R #bit_error_config_carga;
+      R #bit_error_config_descarga;
+      R #bit_error_tiempo_carga;
+      R #bit_error_tiempo_descarga;
+      R #bit_standby;
+      R #bit_ocupacion;
+      R #temp_max;
+      FR #temp_max;
+
+      SPBN stop;
+
+      CALL #SFC_Programa_Carga
+      (  reset                       := true , 
+         actuador1                   := #cargar
+      );
+
+      CALL #SFC1_Programa_Descarga
+      (  reset                       := true , 
+         actuador1                   := #descargar
+      );
+
+stop:      NOP 0;
+
+      UN #start;
+      BEB;
+NETWORK
+TITLE = Plantilla de conexión
+//Conexión de la unidad productiva.
+      U #start;
+      FP #bit_trabajo;
+      S #x_standby;
+      R #x_carga;
+      R #x_descarga;
+      R #x_emer;
+      R #x_error_config_carga;
+      R #x_error_config_descarga;
+      R #x_error_tiempo_carga;
+      R #x_error_tiempo_descarga;
+      R #x_espera_home_carga;
+      R #x_espera_home_descarga;
+NETWORK
+TITLE = Plantilla de congelación
+//Congela la unidad productiva: habilita los componentes y resetea los actuadores (llamadas a maniobras).
+//Se repite el estimulo de activación de la plantilla antes de la instrucción "BEB" para asegurar la salida del bloque.
+      U #cong;
+
+      SPBN _cong;
+
+      R #temp_max;//Habilitación de componentes
+      FR #temp_max;
+
+      CALL #SFC_Programa_Carga
+      (  reset                       := TRUE , 
+         actuador1                   := #cargar
+      );
+
+      CALL #SFC1_Programa_Descarga
+      (  reset                       := TRUE , 
+         actuador1                   := #descargar
+      );
+
+_cong:      NOP 0;
+
+      U #cong;//Repetición del estímulo de activación
+      BEB;
+NETWORK
+TITLE = Salida del estado de emergencia
+//Rearme. Necesaria la señal home (el robot tiene que estar en posición fetal para
+//estar en el estado de standby).
+      U #x_emer;
+      UN #emer;
+      U #rearme;
+      S #x_standby;
+      R #x_emer;
+NETWORK
+TITLE = Rearme errores síncronos
+//Se considera la posibilidad de rearme tras errores síncronos.
+      O #x_error_config_carga;
+      O #x_error_config_descarga;
+      O #x_error_tiempo_carga;
+      O #x_error_tiempo_descarga;
+      U #rearme;
+      S #x_standby;
+      R #x_error_config_carga;
+      R #x_error_config_descarga;
+      R #x_error_tiempo_carga;
+      R #x_error_tiempo_descarga;
+NETWORK
+TITLE = x_standby -> x_carga
+      U #x_standby;
+      U #dc;
+      S #x_carga;
+      R #x_standby;
+NETWORK
+TITLE = x_standby -> x_descarga
+      U #x_standby;
+      U #fin_p;
+      S #x_descarga;
+      R #x_standby;
+NETWORK
+TITLE = x_espera_home_carga -> x_standby
+//Al salir de la maniobra de carga se pasa a un estado de espera (fugaz) antes de pasar a standby.
+//No se trata la fugacidad de este estado porque no afecta en la producción.
+      U #x_espera_home_carga;
+      U #home;
+      S #x_standby;
+      R #x_espera_home_carga;
+NETWORK
+TITLE = x_espera_home_descarga -> x_standby
+//Al salir de la maniobra de descarga se pasa a un estado de espera (fugaz) antes de pasar a standby.
+//No se trata la fugacidad de este estado porque no afecta en la producción.
+      U #x_espera_home_descarga;
+      U #home;
+      S #x_standby;
+      R #x_espera_home_descarga;
+NETWORK
+TITLE = Llamada a la maniobra de carga
+//Entrada de error asíncrono false (se gestiona en la plantilla de desconexión).
+      U #x_carga;
+
+      SPBN _carga;
+      CALL #SFC_Programa_Carga
+      (  sensor1                     := #dc , 
+         sensor2                     := #home , 
+         reset                       := false , 
+         tiempo_error                := #tiempo_max , 
+         temp_error                  := #temp_max , 
+         bit_fin                     := #bit_fin_carga , 
+         bit_error_tiempo            := #bit_error_tiempo_carga , 
+         bit_error_config            := #bit_error_config_carga , 
+         bit_ocupacion               := #bit_ocupacion , 
+         actuador1                   := #cargar
+      );
+
+      U #bit_error_tiempo_carga;
+      S #x_error_tiempo_carga;
+      R #x_carga;
+
+      U #bit_error_config_carga;
+      S #x_error_config_carga;
+      R #x_carga;
+
+      U #bit_fin_carga;
+      S #x_espera_home_carga;
+      R #x_carga;
+
+_carga:      NOP 0;
+
+NETWORK
+TITLE = Llamada a la maniobra de descarga
+      U #x_descarga;
+
+      SPBN _descarga;
+      CALL #SFC1_Programa_Descarga
+      (  sensor1                     := #fin_p , 
+         sensor2                     := #home , 
+         reset                       := false , 
+         tiempo_error                := #tiempo_max , 
+         temp_error                  := #temp_max , 
+         bit_fin                     := #bit_fin_descarga , 
+         bit_error_tiempo            := #bit_error_tiempo_descarga , 
+         bit_error_config            := #bit_error_config_descarga , 
+         bit_ocupacion               := #bit_ocupacion , 
+         actuador1                   := #descargar
+      );
+
+
+      U #bit_error_tiempo_descarga;
+      S #x_error_tiempo_descarga;
+      R #x_descarga;
+
+      U #bit_error_config_descarga;
+      S #x_error_config_descarga;
+      R #x_descarga;
+
+      U #bit_fin_descarga;
+      S #x_espera_home_descarga;
+      R #x_descarga;
+
+_descarga:      NOP 0;
+
+NETWORK
+TITLE = Bit de standby
+//Indica el estado de standby.
+      U #x_standby;
+      = #bit_standby;
+NETWORK
+TITLE = Bit de emergencia
+//Indica el estado de emergencia.
+      U #x_emer;
+      = #bit_emer;
+NETWORK
+TITLE = Bit error tiempo carga
+//Indica el estado de error síncrono por tiempo de carga.
+      U #x_error_tiempo_carga;
+      = #bit_error_tiempo_carga;
+NETWORK
+TITLE = Bit error tiempo descarga
+//Indica el estado de error síncrono por tiempo de descarga.
+      U #x_error_tiempo_descarga;
+      = #bit_error_tiempo_descarga;
+NETWORK
+TITLE = Bit error config carga
+//Indica el estado de error síncrono por mala configuración inicial en la carga.
+      U #x_error_config_carga;
+      = #bit_error_config_carga;
+NETWORK
+TITLE = Bit error config descarga
+//Indica el estado de error síncrono por mala configuración inicial en la descarga.
+      U #x_error_config_descarga;
+      = #bit_error_config_descarga;
+END_FUNCTION_BLOCK
+
+DATA_BLOCK "UP_Robot2_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"UP_Robot"
+
+BEGIN
+
+END_DATA_BLOCK
+
+DATA_BLOCK "UP_Robot1_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"UP_Robot"
+
+BEGIN
+
+END_DATA_BLOCK
+

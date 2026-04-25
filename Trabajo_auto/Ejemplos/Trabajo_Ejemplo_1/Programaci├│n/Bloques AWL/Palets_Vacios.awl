@@ -1,0 +1,275 @@
+﻿FUNCTION "alturaPalets" : Void
+TITLE = Gestión altura pila palets vacíos
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+//Gestiona las señales analógicas de la pila de palets vacíos.
+//Devuelve los conectores con las condiciones necesarias para la implemetación del grafcet.
+//Toma los siguientes parámetros:
+//- RAW: señal analógica muestreada.
+//- BIPOLAR: especifica si la señal puede tomar valores en un rango solo positivo o positivo y negativo.
+//- LO_LIM: altura mínima permitida para la interpolación.
+//- HI_LIM: altura máxima permitida para la interpolación.
+//- h_min: altura mínima de la pila de palets para ser transportada a otro lugar de la fábrica. Se pueden apilar más palets en la pila después de alcanzar este valor.
+//- h_max: altura máxima de la pila de palets para ser transportada a otro lugar de la fábrica. No se pueden apilar más palets en la pila si se alcanza este valor.
+//- reset: desconecta el bloque FC.
+//- REAL_VAL: valor de la magnitud física (altura).
+//- h>h_min: la altura de la pila ha superado h_min.
+//- h>h_max: la altura de la pila ha superado h_max.
+//- h<h_min: la altura de la pila es menor que h_min.
+//- error: la altura medida está fuera de límites.
+   VAR_INPUT 
+      RAW : Int;
+      BIPOLAR : Bool;
+      LO_LIM : Real;
+      HI_LIM : Real;
+      h_min : Real;
+      h_max : Real;
+      reset : Bool;
+   END_VAR
+
+   VAR_OUTPUT 
+      REAL_VAL : Real;
+      "h>h_min" : Bool;
+      "h>h_max" : Bool;
+      "h<h_min" : Bool;
+      error : Bool;
+   END_VAR
+
+   VAR_TEMP 
+      ret_val_1 : Word;
+   END_VAR
+
+
+BEGIN
+NETWORK
+TITLE = Plantilla de desconexión
+//Resetea las salidas
+      U #reset;
+      R #"h>h_min";
+      R #"h>h_max";
+      R #"h<h_min";
+      R #error;
+      BEB;
+NETWORK
+TITLE = Llamada a la función SCALE
+//Convierte la señal muestreada (raw) en señal física (real_val)
+      CALL SCALE
+      (  IN                          := #RAW , 
+         HI_LIM                      := #HI_LIM , 
+         LO_LIM                      := #LO_LIM , 
+         BIPOLAR                     := #BIPOLAR , 
+         RET_VAL                     := #ret_val_1 , 
+         OUT                         := #REAL_VAL
+      );
+NETWORK
+TITLE = Error límites
+//Devuelve error si la señal está fuera de los límites hi_lim y lo_lim
+//Código de error: W#16#0008
+//Error = true si ret_val_err = código de error
+      L #ret_val_1;
+      L W#16#0008;
+      ==I;
+      = #error;
+NETWORK
+TITLE = h > h_min
+//Conector "h > h_min"
+      L #REAL_VAL;//ACU2
+      L #h_min;//ACU1
+      >R;
+      = #"h>h_min";
+NETWORK
+TITLE = h < h_min
+//Conector "h < h_min"
+      U <0;
+      = #"h<h_min";
+NETWORK
+TITLE = h > h_max
+//Conector "h > h_max"
+      L #REAL_VAL;// ACU2
+      L #h_max;// ACU1
+      >R;
+      = #"h>h_max";
+END_FUNCTION
+
+FUNCTION_BLOCK "UP_Palets_Vacios"
+TITLE = Gestión palets vacíos
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+//Funciona como interfaz para conocer el estado de la pila de palets. Se sirve de la función alturaPalets. Tiene los siguientes parámetros:
+//- start: conecta y desconecta la unidad productiva.
+//- Emer: entra en estado de emergencia.
+//- Rearme: sale del estado de emergencia.
+//- Cong: entra en congelación.
+//- Hraw: señal de entrada analógica muestreada que representa la altura de la pila de palets vacíos.
+//- LO_LIM: límite mínimo de altura para la interpolación.
+//- HI_LIM: límite máximo de altura para la interpolación.
+//- Hmin: altura mínima (magnitud física) de la pila de palets vacíos para ser recogida.
+//- Hmax: altura máxima (magnitud física) de la pila de palets vacíos para saturarse (no se pueden colocar más palets sobre la misma).
+//- Recoger_pila: llamada a los AGVs para recoger la pila de palets vacíos.
+//- Pila_saturada: llamada a los AGVs para recoger la pila de palets vacíos (urgentemente).
+//- Error_medida: la magnitud medida está fuera de rango (LO_LIM – HI_LIM).
+//- H_real: altura de la pila de palets vacíos en forma física.
+//- H>hmin: conector indicando que la altura de la pila de palets es mayor que h_min.
+//- H<hmin: conector indicando que la altura de la pila de palets es menor que h_min.
+//- H>hmax: conector indicando que la altura de la pila de palets es mayor que h_max.
+//- X1: estado de standby.
+//- X2: estado indicando que la altura de la pila de palets vacíos es mayor que hmin.
+//- X3: estado indicando que la altura de la pila de palets vacíos es mayor que hmax.
+//- X_emer: estado de emergencia.
+//- Bit_trabajo: bit de control del encendido de la unidad productiva (flanco positivo de start).
+//- Bit_standby: bit indicando el estado de standby.
+//- Bit_emer: bit indicando el estado de emergencia.
+//
+   VAR_INPUT 
+      start : Bool;
+      emer : Bool;
+      rearme : Bool;
+      cong : Bool;
+      hraw : Int;
+      LO_LIM : Real;
+      HI_LIM : Real;
+      hmin : Real;
+      hmax : Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      recoger_pila : Bool;
+      pila_saturada : Bool;
+      error_medida : Bool;
+      h_real : Real;
+   END_VAR
+
+   VAR_IN_OUT 
+      "h>hmin" : Bool;
+      "h>hmax" : Bool;
+      "h<hmin" : Bool;
+   END_VAR
+
+   VAR 
+      x1 : Bool;
+      x2 : Bool;
+      x3 : Bool;
+      x_emer : Bool;
+      bit_trabajo : Bool;
+      bit_standby : Bool;
+      bit_emer : Bool;
+   END_VAR
+
+
+BEGIN
+NETWORK
+TITLE = Plantilla de desconexión - Error asíncrono
+//Entra en error asíncrono por emergencia. Desconecta las salidas y activa el estado de emergencia.
+      U #emer;
+      S #x_emer;
+      R #recoger_pila;
+      R #pila_saturada;
+      R #bit_standby;
+      R #error_medida;
+      R #"h<hmin";
+      R #"h>hmax";
+      R #"h>hmin";
+      = #bit_emer;
+      BEB;
+NETWORK
+TITLE = Plantilla de desconexión - STOP
+//Se activa al desconectar la unidad productiva. Resetea los bits de control (importante resetear el bit de trabajo para futuras conexiones) y las salidas. 
+      UN #start;
+      R #bit_trabajo;
+      R #bit_standby;
+      R #recoger_pila;
+      R #pila_saturada;
+      R #error_medida;
+      R #"h<hmin";
+      R #"h>hmax";
+      R #"h>hmin";
+      BEB;
+NETWORK
+TITLE = Plantilla de conexión
+//Conecta la unidad productiva por flanco positivo del bit de trabajo (debe ser reseteado adecuadamente después de la desconexión). Establece el estado de standby como estado inicial.
+      U #start;
+      FP #bit_trabajo;
+      S #x1;
+      R #x2;
+      R #x3;
+      R #x_emer;
+NETWORK
+TITLE = Plantilla de congelación
+//Resetea las salidas y mantiene el estado actual en el que estaba para poder seguir produciendo tras descongelar.
+      U #cong;
+      R #recoger_pila;
+      R #pila_saturada;
+      R #error_medida;
+      R #"h<hmin";
+      R #"h>hmax";
+      R #"h>hmin";
+      BEB;
+NETWORK
+TITLE = Salida de emergencia
+//Rearme desde el estado de emergencia.
+      U #x_emer;
+      UN #emer;
+      U #rearme;
+      S #x1;
+      R #x_emer;
+NETWORK
+TITLE = Llamada a altura palets
+//Llama al FC alturaPalets para conocer la altura de la pila de palets, así como los conectores usados para la transición entre estados (h<hmin, h>hmin, h>hmax). Los datos de los valores extremos, así como de hmin y hmax están en el DB datosProduccion.
+      CALL "alturaPalets"
+      (  RAW                         := #hraw , 
+         BIPOLAR                     := FALSE , 
+         LO_LIM                      := #LO_LIM , 
+         HI_LIM                      := #HI_LIM , 
+         h_min                       := #hmin , 
+         h_max                       := #hmax , 
+         reset                       := FALSE , 
+         REAL_VAL                    := #h_real , 
+         "h>h_min"                   := #"h>hmin" , 
+         "h>h_max"                   := #"h>hmax" , 
+         "h<h_min"                   := #"h<hmin" , 
+         error                       := #error_medida
+      );
+NETWORK
+TITLE = x1 -> x2
+      U #x1;
+      U #"h>hmin";
+      S #x2;
+      R #x1;
+NETWORK
+TITLE = x1 -> x3
+      U #x1;
+      U #"h>hmax";
+      S #x3;
+      R #x1;
+NETWORK
+TITLE = x2 -> x1
+      U #x2;
+      U #"h<hmin";
+      S #x1;
+      R #x2;
+NETWORK
+TITLE = x3 -> x1
+      U #x3;
+      U #"h<hmin";
+      S #x1;
+      R #x3;
+NETWORK
+TITLE = Recoger pila
+      U #x2;
+      = #recoger_pila;
+NETWORK
+TITLE = Pila saturada
+      U #x3;
+      = #pila_saturada;
+END_FUNCTION_BLOCK
+
+DATA_BLOCK "UP_Palets_Vacios_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"UP_Palets_Vacios"
+
+BEGIN
+
+END_DATA_BLOCK
+

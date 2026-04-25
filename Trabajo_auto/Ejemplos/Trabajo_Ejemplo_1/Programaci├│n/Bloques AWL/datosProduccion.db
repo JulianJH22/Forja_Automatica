@@ -1,0 +1,92 @@
+﻿DATA_BLOCK "datosLotePequenio"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+   VAR 
+      tmax_cnc_lapiz : S5Time;   // Tiempo máximo cnc
+      tmax_cnc_sacapuntas : S5Time;
+      tmax_cnc_escuadra : S5Time;
+      tmax_cnc_cartabon : S5Time;
+   END_VAR
+
+
+BEGIN
+   tmax_cnc_lapiz := s5t#7s;
+   tmax_cnc_sacapuntas := s5t#10s;
+   tmax_cnc_escuadra := s5t#5s;
+   tmax_cnc_cartabon := s5t#5s;
+
+END_DATA_BLOCK
+
+DATA_BLOCK "datosProduccion"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+   VAR 
+      tmax_simple_efecto : S5Time;   // Tiempo máximo expansión / compresión
+      tmax_carga_descarga : S5Time;   // Tiempo máximo carga / descarga
+      tmax_cnc_lapiz : S5Time;   // Tiempo máximo cnc
+      tmax_cnc_sacapuntas : S5Time;
+      tmax_cnc_escuadra : S5Time;
+      tmax_cnc_cartabon : S5Time;
+      LO_LIM : Real;
+      HI_LIM : Real;
+      hmin : Real;
+      hmax : Real;
+   END_VAR
+
+
+BEGIN
+   tmax_simple_efecto := s5t#5s;
+   tmax_carga_descarga := s5t#10s;
+   tmax_cnc_lapiz := s5t#14s;
+   tmax_cnc_sacapuntas := s5t#20s;
+   tmax_cnc_escuadra := s5t#10s;
+   tmax_cnc_cartabon := s5t#10s;
+   LO_LIM := 0.0;
+   HI_LIM := 50.0;
+   hmin := 25.0;
+   hmax := 30.0;
+
+END_DATA_BLOCK
+
+DATA_BLOCK "datosLoteMediano"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+   VAR 
+      tmax_cnc_lapiz : S5Time;   // Tiempo máximo cnc
+      tmax_cnc_sacapuntas : S5Time;
+      tmax_cnc_escuadra : S5Time;
+      tmax_cnc_cartabon : S5Time;
+   END_VAR
+
+
+BEGIN
+   tmax_cnc_lapiz := s5t#14s;
+   tmax_cnc_sacapuntas := s5t#20s;
+   tmax_cnc_escuadra := s5t#10s;
+   tmax_cnc_cartabon := s5t#10s;
+
+END_DATA_BLOCK
+
+DATA_BLOCK "datosLoteGrande"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+   VAR 
+      tmax_cnc_lapiz : S5Time;   // Tiempo máximo cnc
+      tmax_cnc_sacapuntas : S5Time;
+      tmax_cnc_escuadra : S5Time;
+      tmax_cnc_cartabon : S5Time;
+   END_VAR
+
+
+BEGIN
+   tmax_cnc_lapiz := s5t#21s;
+   tmax_cnc_sacapuntas := s5t#30s;
+   tmax_cnc_escuadra := s5t#15s;
+   tmax_cnc_cartabon := s5t#15s;
+
+END_DATA_BLOCK
+

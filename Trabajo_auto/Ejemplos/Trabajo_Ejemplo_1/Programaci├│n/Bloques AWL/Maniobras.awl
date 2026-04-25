@@ -1,0 +1,346 @@
+﻿FUNCTION_BLOCK "SFC_Cilindro"
+TITLE = Maniobras del cilindro (expansión y compresión)
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+//Se encarga de ejecutar las maniobras de carga y descarga de la unidad productiva.
+//Tiene los siguientes parámetros:
+//- sini: estado inicial del cilindro.
+//- sfin: estado final del cilindro.
+//- reset: indica la desconexión por error asíncrono.
+//- tiempo_error: tiempo límite antes de error síncrono.
+//- temp_error: temporizador de error síncrono.
+//- bit_fin: la maniobra ha finalizado correctamente.
+//- bit_error_tiempo: tiempo límite agotado (error síncrono).
+//- bit_error_config: mala configuración inicial (error síncrono).
+//- bit_ocupacion: la unidad productiva está ejecutando la maniobra (x1)
+//- actuador: programa a cargar en el robot.
+//- bit_trabajo: conecta el bloque maniobra.
+//- xe: estado inicial.
+//- x1: estado de ejecución del programa.
+//- x2: estado de error síncrono por tiempo.
+//- x3: estado de error síncrono por mala configuración inicial.
+//- xs: estado final.
+   VAR_INPUT 
+      sini : Bool;
+      sfin : Bool;
+      reset : Bool;
+      tiempo_error : S5Time;
+      temp_error : Timer;
+   END_VAR
+
+   VAR_OUTPUT 
+      bit_fin : Bool;
+      bit_error_tiempo : Bool;
+      bit_error_config : Bool;
+      bit_ocupacion : Bool;
+      actuador : Bool;
+   END_VAR
+
+   VAR 
+      xe : Bool;
+      x1 : Bool;
+      x2 : Bool;
+      x3 : Bool;
+      xs : Bool;
+      bit_trabajo : Bool;
+   END_VAR
+
+
+BEGIN
+NETWORK
+TITLE = Plantilla de desconexión - error asíncrono
+//Desconexión en caso de error asíncrono (actuadores, temporizadores, bit de fin y bit de trabajo)
+      U #reset;
+      R #bit_fin;
+      R #bit_trabajo;//Futuros arranques
+      R #bit_ocupacion;
+      R #actuador;
+      R #temp_error;//Habilitación de temporizadores
+      FR #temp_error;
+      BEB;
+NETWORK
+TITLE = Error síncrono por tiempo
+//Desconexión por tiempo límite (actuadores, temporizadores, bit de fin y bit de trabajo). 
+//Es necesario desconectar x2 porque si no no se podría volver a ejecutar la maniobra (se saldría continuamente
+//del bloque).
+//Se deja todo preparado para futuras conexiones.
+      U #x2;
+      S #bit_error_tiempo;
+      R #x2;
+      R #bit_fin;
+      R #bit_trabajo;//Futuros arranques
+      R #bit_ocupacion;
+      R #actuador;
+      R #temp_error;// Habilitación de temporizadores
+      FR #temp_error;
+      BEB;
+NETWORK
+TITLE = Error síncrono por mala configuración inicial
+//Desconexión por mala configuración inicial.
+//Es necesario desconectar x3 porque si no no se podría volver a ejectar la maniobra.
+//Se deja todo preparado para futuras conexiones.
+      U #x3;
+      S #bit_error_config;
+      R #x3;
+      R #bit_trabajo;
+      R #bit_fin;
+      R #bit_ocupacion;
+      R #actuador;
+      R #temp_error;
+      FR #temp_error;
+      BEB;
+NETWORK
+TITLE = Plantilla de desconexión - final de maniobra
+//Desconexión por fin de la maniobra
+      U #xs;
+      S #bit_fin;
+      R #xs;
+      R #bit_trabajo;
+      R #bit_ocupacion;
+      R #actuador;
+      R #temp_error;
+      FR #temp_error;
+      BEB;
+NETWORK
+TITLE = Plantilla de conexión
+//Inicialización del bloque a valores iniciales.
+//Se resetean los bits de control.
+      SET;
+      FP #bit_trabajo;
+      R #bit_fin;
+      R #bit_error_config;
+      R #bit_error_tiempo;
+      R #bit_ocupacion;
+      S #xe;
+      R #x1;
+      R #x2;
+      R #x3;
+      R #xs;
+NETWORK
+TITLE = Configuración temporizador maniobra
+//Carga el temporizador que establece el tiempo para llevar a cabo la maniobra.
+//Temporizador se (vigila el tiempo en el estado actual).
+      U #x1;
+      L #tiempo_error;
+      SE #temp_error;
+NETWORK
+TITLE = xe -> x3 (Error síncrono por mala configuración inicial)
+//Si el cilindro no se encuentra en la posición inicial (expandido o contraído, según la maniobra) o
+//si se encuentra en la posición final, la configuración inicial es incorrecta.
+      ON #sini;
+      O #sfin;
+      U #xe;
+      S #x3;
+      R #xe;
+NETWORK
+TITLE = xe -> x1
+      U #xe;
+      U #sini;
+      S #x1;
+      R #xe;
+NETWORK
+TITLE = x1 -> xs
+      U #x1;
+      U #sfin;
+      S #xs;
+      R #x1;
+NETWORK
+TITLE = x1 -> x2 (Error síncrono por tiempo)
+//Tiempo límite agotado
+      U #x1;
+      U #temp_error;
+      S #x2;
+      R #x1;
+NETWORK
+TITLE = Acción (expandir o comprimir)
+      U #x1;
+      = #actuador;
+      = #bit_ocupacion;
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK "SFC_Programa"
+TITLE = Programas unidad productiva
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+//Ejecuta los programas de la unidad productiva con control de tiempo y configuración inicial.
+//Tiene los siguientes parámetros:
+//- sensor1: receptividad entre xe y x1.
+//- sensor2: receptividad entre xs y x1.
+//- reset: indica la desconexión por error asíncrono.
+//- tiempo_error: tiempo límite antes de error síncrono.
+//- temp_error: temporizador de error síncrono.
+//- bit_fin: la maniobra ha finalizado correctamente.
+//- bit_error_tiempo: tiempo límite agotado (error síncrono).
+//- bit_error_config: mala configuración inicial (error síncrono).
+//- bit_ocupacion: maniobra en ejecución.
+//- actuador1: programa a cargar en el robot.
+//- bit_trabajo: conecta el bloque maniobra.
+//- xe: estado inicial.
+//- x1: estado de ejecución del programa.
+//- x2: estado de error síncrono por tiempo.
+//- x3: estado de error síncrono por mala configuración inicial.
+//- xs: estado final.
+//- mf_sensor2: marca de flanco del sensor 2.
+//- mp_sensor2: merca de pulso del sensor 2.
+   VAR_INPUT 
+      sensor1 : Bool;
+      sensor2 : Bool;
+      reset : Bool;
+      tiempo_error : S5Time := S5T#10S;
+      temp_error : Timer;
+   END_VAR
+
+   VAR_OUTPUT 
+      bit_fin : Bool;
+      bit_error_tiempo : Bool;
+      bit_error_config : Bool;
+      bit_ocupacion : Bool;
+      actuador1 : Bool;
+   END_VAR
+
+   VAR 
+      xe : Bool;
+      x1 : Bool;
+      x2 : Bool;
+      x3 : Bool;
+      xs : Bool;
+      bit_trabajo : Bool;
+      mf_sensor2 : Bool;
+   END_VAR
+
+   VAR_TEMP 
+      mp_sensor2 : Bool;
+   END_VAR
+
+
+BEGIN
+NETWORK
+TITLE = Plantilla de desconexión - error asíncrono
+//Desconexión en caso de error asíncrono (actuadores, temporizadores, bit de fin y bit de trabajo)
+      U #reset;
+      R #bit_fin;
+      R #bit_trabajo;//Futuros arranques
+      R #bit_ocupacion;
+      R #actuador1;
+      R #temp_error;//Habilitación de temporizadores
+      FR #temp_error;
+      R #mf_sensor2;
+      BEB;
+NETWORK
+TITLE = Error síncrono por tiempo
+//Desconexión por tiempo límite (actuadores, temporizadores, bit de fin y bit de trabajo). 
+//Es necesario desconectar x2 porque si no no se podría volver a ejecutar la maniobra (se saldría continuamente
+//del bloque).
+//Se deja todo preparado para futuras conexiones.
+      U #x2;
+      S #bit_error_tiempo;
+      R #x2;
+      R #bit_fin;
+      R #bit_trabajo;//Futuros arranques
+      R #bit_ocupacion;
+      R #actuador1;
+      R #temp_error;// Habilitación de temporizadores
+      FR #temp_error;
+      R #mf_sensor2;
+      BEB;
+NETWORK
+TITLE = Error síncrono por mala configuración inicial
+//Desconexión por mala configuración inicial.
+//Es necesario desconectar x3 porque si no no se podría volver a ejectar la maniobra.
+//Se deja todo preparado para futuras conexiones.
+      U #x3;
+      S #bit_error_config;
+      R #x3;
+      R #bit_trabajo;
+      R #bit_fin;
+      R #bit_ocupacion;
+      R #actuador1;
+      R #temp_error;
+      FR #temp_error;
+      R #mf_sensor2;
+      BEB;
+NETWORK
+TITLE = Plantilla de desconexión - final de maniobra
+//Desconexión por fin de la maniobra
+      U #xs;
+      S #bit_fin;
+      R #xs;
+      R #bit_trabajo;
+      R #bit_ocupacion;
+      R #actuador1;
+      R #temp_error;
+      FR #temp_error;
+      R #mf_sensor2;
+      BEB;
+NETWORK
+TITLE = Plantilla de conexión
+//Inicialización del bloque a valores iniciales.
+//Se resetean los bits de control.
+      SET;
+      FP #bit_trabajo;
+      R #bit_fin;
+      R #bit_error_config;
+      R #bit_error_tiempo;
+      R #bit_ocupacion;
+      S #xe;
+      R #x1;
+      R #x2;
+      R #x3;
+      R #xs;
+NETWORK
+TITLE = Configuración flancos
+//Sensor 2 representa la señal home.
+//La maniobra comienza con el robot en home y termina con el robot en home. 
+//Se produce un flanco de la señal home (si se gestiona por nivel la maniobra de 
+//carga duraría tan solo un ciclo).
+      U #sensor2;
+      FP #mf_sensor2;
+      = #mp_sensor2;
+NETWORK
+TITLE = Configuración temporizador maniobra
+//Carga el temporizador que establece el tiempo para llevar a cabo la maniobra.
+//Temporizador se (vigila el tiempo en el estado actual).
+      U #x1;
+      L #tiempo_error;
+      SE #temp_error;
+NETWORK
+TITLE = x1 -> x2 (Error síncrono por tiempo)
+//Tiempo límite agotado
+      U #x1;
+      U #temp_error;
+      S #x2;
+      R #x1;
+NETWORK
+TITLE = x1 -> xs - Estado fugaz
+//Al entrar a la maniobra se produce una marca de pulso si la configuración inicial es correcta: "sensor2" está a nivel alto y la marca de flanco comienza el bloque siempre a nivel bajo. Esto provocaría que la maniobra sea fugaz.
+//Se cambia el orden de las etapas para arreglar este problema.
+      U #x1;
+      U #mp_sensor2;
+      S #xs;
+      R #x1;
+NETWORK
+TITLE = xe -> x3 (Error síncrono por mala configuración inicial)
+//El sensor 1 representa la señal que activa el programa del robot.
+//El sensor 2 representa la señal home.
+//Cuando se inicia la maniobra el robot debe estar en home y la señal del programa
+//tiene que estar activa.
+//El error es prioritario ante la transición a la ejecución del programa.
+      ON #sensor1;
+      ON #sensor2;
+      U #xe;
+      S #x3;
+      R #xe;
+NETWORK
+TITLE = xe -> x1
+      U #xe;
+      U #sensor1;
+      U #sensor2;
+      S #x1;
+      R #xe;
+NETWORK
+TITLE = Cargar programa
+      U #x1;
+      = #actuador1;
+      = #bit_ocupacion;
+END_FUNCTION_BLOCK
+
